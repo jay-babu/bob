@@ -149,7 +149,22 @@ func (o *{{$tAlias.UpSingular}}Template) Create(ctx context.Context, exec bob.Ex
 			{{- if not ($table.RelIsRequired $rel)}}{{continue}}{{end -}}
 			{{- $relAlias := $tAlias.Relationship .Name -}}
 			if o.r.{{$relAlias}} == nil {
-				missingRels = append(missingRels, "{{$relAlias}}")
+				{{/* Only report missing if FK columns are also not explicitly set */}}
+				{{$relAlias}}FKsSet := true
+				{{range $rel.ValuedSides -}}
+					{{- if ne .TableName $table.Key}}{{continue}}{{end -}}
+					{{range .Mapped -}}
+						{{- if ne .ExternalTable $rel.Foreign}}{{continue}}{{end -}}
+						{{- $fromColA := index $tAlias.Columns .Column -}}
+						{{- $col := $table.GetColumn .Column -}}
+						if !({{$.Types.IsOptionalValid $.CurrentPackage $col.Type $col.Nullable (cat "opt." $fromColA)}}) {
+							{{$relAlias}}FKsSet = false
+						}
+					{{end -}}
+				{{- end}}
+				if !{{$relAlias}}FKsSet {
+					missingRels = append(missingRels, "{{$relAlias}}")
+				}
 			}
 		{{end -}}
 		if len(missingRels) > 0 {
@@ -165,31 +180,47 @@ func (o *{{$tAlias.UpSingular}}Template) Create(ctx context.Context, exec bob.Ex
 		{{- if not ($table.RelIsRequired $rel)}}{{continue}}{{end -}}
 		{{- $ftable := $.Aliases.Table .Foreign -}}
 		{{- $relAlias := $tAlias.Relationship .Name -}}
-		if o.r.{{$relAlias}} == nil {
-      {{$tAlias.UpSingular}}Mods.WithNew{{$relAlias}}().Apply(ctx, o)
-		}
 
 		var rel{{$index}} *models.{{$ftable.UpSingular}}
 
-		if o.r.{{$relAlias}}.o.alreadyPersisted {
-			rel{{$index}} = o.r.{{$relAlias}}.o.Build()
-		} else {
-			rel{{$index}}, err = o.r.{{$relAlias}}.o.Create(ctx, exec)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-
+		{{/* Check if all FK columns for this relationship are already explicitly set */}}
+		allFKsSet{{$index}} := true
 		{{range $rel.ValuedSides -}}
 			{{- if ne .TableName $table.Key}}{{continue}}{{end -}}
-			{{range .Mapped}}
+			{{range .Mapped -}}
 				{{- if ne .ExternalTable $rel.Foreign}}{{continue}}{{end -}}
 				{{- $fromColA := index $tAlias.Columns .Column -}}
-				{{- $relIndex := printf "rel%d" $index -}}
-				opt.{{$fromColA}} = {{$.Tables.ColumnAssigner $.CurrentPackage $.Importer $.Types $.Aliases $.Table.Key $rel.Foreign .Column .ExternalColumn $relIndex true}}
-			{{end}}
+				{{- $col := $table.GetColumn .Column -}}
+				if !({{$.Types.IsOptionalValid $.CurrentPackage $col.Type $col.Nullable (cat "opt." $fromColA)}}) {
+					allFKsSet{{$index}} = false
+				}
+			{{end -}}
 		{{- end}}
+
+		if !allFKsSet{{$index}} {
+			if o.r.{{$relAlias}} == nil {
+				{{$tAlias.UpSingular}}Mods.WithNew{{$relAlias}}().Apply(ctx, o)
+			}
+
+			if o.r.{{$relAlias}}.o.alreadyPersisted {
+				rel{{$index}} = o.r.{{$relAlias}}.o.Build()
+			} else {
+				rel{{$index}}, err = o.r.{{$relAlias}}.o.Create(ctx, exec)
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			{{range $rel.ValuedSides -}}
+				{{- if ne .TableName $table.Key}}{{continue}}{{end -}}
+				{{range .Mapped}}
+					{{- if ne .ExternalTable $rel.Foreign}}{{continue}}{{end -}}
+					{{- $fromColA := index $tAlias.Columns .Column -}}
+					{{- $relIndex := printf "rel%d" $index -}}
+					opt.{{$fromColA}} = {{$.Tables.ColumnAssigner $.CurrentPackage $.Importer $.Types $.Aliases $.Table.Key $rel.Foreign .Column .ExternalColumn $relIndex true}}
+				{{end}}
+			{{- end}}
+		}
 	{{end}}
 
 	if err = ensureCreatable{{$tAlias.UpSingular}}(opt, o.requireAll); err != nil {
@@ -205,7 +236,9 @@ func (o *{{$tAlias.UpSingular}}Template) Create(ctx context.Context, exec bob.Ex
 		{{- if not ($table.RelIsRequired $rel) -}}{{continue}}{{end -}}
 		{{- $ftable := $.Aliases.Table .Foreign -}}
 		{{- $relAlias := $tAlias.Relationship .Name -}}
-		m.R.{{$relAlias}} = rel{{$index}}
+		if rel{{$index}} != nil {
+			m.R.{{$relAlias}} = rel{{$index}}
+		}
 	{{end}}
 
   if err := o.insertOptRels(ctx, exec, m); err != nil {
