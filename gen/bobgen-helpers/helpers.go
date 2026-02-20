@@ -135,7 +135,24 @@ func EnumType(types drivers.Types, enum string) string {
 	return fullTyp
 }
 
-func Migrate(ctx context.Context, db *sql.DB, dir fs.FS, pattern string) error {
+type MigrateOption func(*migrateConfig)
+
+type migrateConfig struct {
+	noTxPattern string
+}
+
+func WithNoTransactionPattern(pattern string) MigrateOption {
+	return func(c *migrateConfig) {
+		c.noTxPattern = pattern
+	}
+}
+
+func Migrate(ctx context.Context, db *sql.DB, dir fs.FS, pattern string, opts ...MigrateOption) error {
+	var cfg migrateConfig
+	for _, o := range opts {
+		o(&cfg)
+	}
+
 	if dir == nil {
 		dir = os.DirFS(".")
 	}
@@ -152,8 +169,26 @@ func Migrate(ctx context.Context, db *sql.DB, dir fs.FS, pattern string) error {
 		}
 
 		fmt.Printf("migrating %s...\n", filePath)
-		if _, err = db.ExecContext(ctx, string(content)); err != nil {
+
+		if cfg.noTxPattern != "" && strings.Contains(string(content), cfg.noTxPattern) {
+			if _, err = db.ExecContext(ctx, string(content)); err != nil {
+				return fmt.Errorf("migrating %s: %w", filePath, err)
+			}
+			continue
+		}
+
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			return fmt.Errorf("beginning transaction for %s: %w", filePath, err)
+		}
+
+		if _, err = tx.ExecContext(ctx, string(content)); err != nil {
+			tx.Rollback() //nolint:errcheck
 			return fmt.Errorf("migrating %s: %w", filePath, err)
+		}
+
+		if err = tx.Commit(); err != nil {
+			return fmt.Errorf("committing transaction for %s: %w", filePath, err)
 		}
 	}
 
