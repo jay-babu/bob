@@ -66,8 +66,16 @@ func RunPostgres(ctx context.Context, state *gen.State[any], config Config, plug
 
 func getPsqlDriver(ctx context.Context, config Config) (psqlDriver.Interface, error) {
 	postgresContainer, err := postgres.Run(
-		ctx, "pgvector/pgvector:0.8.0-pg16",
+		ctx, "pgvector/pgvector:0.8.2-pg17",
 		postgres.BasicWaitStrategies(),
+		testcontainers.CustomizeRequest(testcontainers.GenericContainerRequest{
+			ContainerRequest: testcontainers.ContainerRequest{
+				Cmd: []string{
+					"-c", "wal_level=logical",
+					"-c", "search_path=public,reference,audit",
+				},
+			},
+		}),
 		testcontainers.WithLogger(log.New(io.Discard, "", log.LstdFlags)),
 	)
 	if err != nil {
