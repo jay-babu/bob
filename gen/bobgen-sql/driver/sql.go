@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	defaultPostgresDriverImage = "pgvector/pgvector:0.8.0-pg16"
+	defaultPostgresDriverImage = "pgvector/pgvector:0.8.2-pg17"
 	defaultMySQLDriverImage    = "mysql:8.0.35"
 )
 
@@ -79,6 +79,14 @@ func getPsqlDriver(ctx context.Context, config Config) (psqlDriver.Interface, er
 	postgresContainer, err := postgres.Run(
 		ctx, config.DriverImage,
 		postgres.BasicWaitStrategies(),
+		testcontainers.CustomizeRequest(testcontainers.GenericContainerRequest{
+			ContainerRequest: testcontainers.ContainerRequest{
+				Cmd: []string{
+					"-c", "wal_level=logical",
+					"-c", "search_path=public,reference,audit",
+				},
+			},
+		}),
 		testcontainers.WithLogger(log.New(io.Discard, "", log.LstdFlags)),
 	)
 	if err != nil {
