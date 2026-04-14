@@ -35,6 +35,8 @@ type Config struct {
 	Dialect string
 	// Glob pattern to match migration files
 	Pattern string
+	// If set, migration files containing this pattern are not wrapped in a transaction
+	NoTxPattern string `yaml:"no_tx_pattern"`
 	// The database schemas to generate models for
 	Schemas []string
 	// The name of this schema will not be included in the generated models
@@ -48,6 +50,14 @@ type Config struct {
 	// Driver image for running migrations
 	DriverImage string `yaml:"driver_image"`
 	fs          fs.FS
+}
+
+func (c Config) migrateOpts() []helpers.MigrateOption {
+	var opts []helpers.MigrateOption
+	if c.NoTxPattern != "" {
+		opts = append(opts, helpers.WithNoTransactionPattern(c.NoTxPattern))
+	}
+	return opts
 }
 
 func RunPostgres(ctx context.Context, state *gen.State[any], config Config, pluginsConfig plugins.Config) error {
@@ -91,7 +101,7 @@ func getPsqlDriver(ctx context.Context, config Config) (psqlDriver.Interface, er
 	}
 	defer db.Close()
 
-	if err := helpers.Migrate(ctx, db, config.fs, config.Pattern); err != nil {
+	if err := helpers.Migrate(ctx, db, config.fs, config.Pattern, config.migrateOpts()...); err != nil {
 		return nil, fmt.Errorf("migrating: %w", err)
 	}
 	db.Close() // close early
@@ -150,7 +160,7 @@ func getMySQLDriver(ctx context.Context, config Config) (mysqlDriver.Interface, 
 	}
 	defer db.Close()
 
-	if err := helpers.Migrate(ctx, db, config.fs, config.Pattern); err != nil {
+	if err := helpers.Migrate(ctx, db, config.fs, config.Pattern, config.migrateOpts()...); err != nil {
 		return nil, fmt.Errorf("migrating: %w", err)
 	}
 	db.Close() // close early
@@ -205,7 +215,7 @@ func getSQLiteDriver(ctx context.Context, config Config) (sqliteDriver.Interface
 		}
 	}
 
-	if err := helpers.Migrate(ctx, db, config.fs, config.Pattern); err != nil {
+	if err := helpers.Migrate(ctx, db, config.fs, config.Pattern, config.migrateOpts()...); err != nil {
 		return nil, fmt.Errorf("migrating: %w", err)
 	}
 	db.Close() // close early
