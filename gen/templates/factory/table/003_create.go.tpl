@@ -5,7 +5,19 @@
 {{$table := .Table}}
 {{$tAlias := .Aliases.Table $table.Key}}
 
-func ensureCreatable{{$tAlias.UpSingular}}(m *models.{{$tAlias.UpSingular}}Setter) {
+func ensureCreatable{{$tAlias.UpSingular}}(m *models.{{$tAlias.UpSingular}}Setter, requireAll bool) error {
+  {{- $hasRequiredCols := false -}}
+  {{- range $column := $table.Columns -}}
+    {{- if $column.Default}}{{continue}}{{end -}}
+    {{- if $column.Nullable}}{{continue}}{{end -}}
+    {{- if $column.Generated}}{{continue}}{{end -}}
+    {{- $hasRequiredCols = true -}}
+  {{- end -}}
+
+  {{if $hasRequiredCols -}}
+  var missing []string
+  {{end -}}
+
   {{range $column := $table.Columns -}}
     {{- if $column.Default}}{{continue}}{{end -}}
     {{- if $column.Nullable}}{{continue}}{{end -}}
@@ -14,11 +26,26 @@ func ensureCreatable{{$tAlias.UpSingular}}(m *models.{{$tAlias.UpSingular}}Sette
     {{- $colGetter := $.Types.ToOptional $.CurrentPackage $.Importer $column.Type "val" $column.Nullable $column.Nullable -}}
     {{- $typDef :=  $.Types.Index $column.Type -}}
     {{- $colTyp := or $typDef.AliasOf $column.Type -}}
-    if {{$.Types.IsOptionalInvalid $.CurrentPackage $column.Type $column.Nullable (cat "m." $colAlias)}} {
-      val := random_{{normalizeType $column.Type}}(nil, {{$column.LimitsString}})
-      m.{{$colAlias}} = {{$colGetter}}
+    if !({{$.Types.IsOptionalValid $.CurrentPackage $column.Type $column.Nullable (cat "m." $colAlias)}}) {
+      if requireAll {
+        missing = append(missing, "{{$colAlias}}")
+      } else {
+        val := random_{{normalizeType $column.Type}}(nil, {{$column.LimitsString}})
+        m.{{$colAlias}} = {{$colGetter}}
+      }
     }
   {{end -}}
+
+  {{if $hasRequiredCols -}}
+  if len(missing) > 0 {
+    return &MissingRequiredFieldsError{
+      TableName: "{{$tAlias.UpSingular}}",
+      Missing:   missing,
+    }
+  }
+  {{end -}}
+
+  return nil
 }
 
 // insertOptRels creates and inserts any optional the relationships on *models.{{$tAlias.UpSingular}}
@@ -108,54 +135,99 @@ func (o *{{$tAlias.UpSingular}}Template) insertOptRels(ctx context.Context, exec
 // Relations objects are also inserted and placed in the .R field
 func (o *{{$tAlias.UpSingular}}Template) Create(ctx context.Context, exec bob.Executor) (*models.{{$tAlias.UpSingular}}, error) {
 	var err error
-	opt := o.BuildSetter()
-	ensureCreatable{{$tAlias.UpSingular}}(opt)
+	opt := o.BuildSetter();
 
 	// Retrieve ancestor models from context to avoid duplicate parent creation.
 	// Parents are keyed by "parent_table:child_table:child_rel_name".
-	// This works regardless of NoBackReferencing since it only uses child-side metadata.
 	mInCreation, _ := modelsInCreationCtx.Value(ctx)
 
+	{{- $hasRequiredRels := false -}}
+	{{- range $rel := $.Relationships.Get $table.Key -}}
+		{{- if not ($table.RelIsRequired $rel)}}{{continue}}{{end -}}
+		{{- $hasRequiredRels = true -}}
+	{{- end}}
+
+	{{- /* Step 1: Compute FK-set flags and reusable parent models for each required relationship */ -}}
 	{{range $index, $rel := $.Relationships.Get $table.Key -}}
 		{{- if not ($table.RelIsRequired $rel)}}{{continue}}{{end -}}
 		{{- $ftable := $.Aliases.Table .Foreign -}}
 		{{- $relAlias := $tAlias.Relationship .Name -}}
-
-		var rel{{$index}} *models.{{$ftable.UpSingular}}
-
-		if o.r.{{$relAlias}} == nil {
-      if parentModel, found := mInCreation["{{$rel.Foreign}}:{{$table.Key}}:{{$rel.Name}}"]; found {
-        if pModel, ok := parentModel.(*models.{{$ftable.UpSingular}}); ok {
-          rel{{$index}} = pModel
-        }
-      }
-		}
-
-		if rel{{$index}} == nil {
-			if o.r.{{$relAlias}} == nil {
-				{{$tAlias.UpSingular}}Mods.WithNew{{$relAlias}}().Apply(ctx, o)
-			}
-
-			if o.r.{{$relAlias}}.o.alreadyPersisted {
-				rel{{$index}} = o.r.{{$relAlias}}.o.Build()
-			} else {
-				rel{{$index}}, err = o.r.{{$relAlias}}.o.Create(ctx, exec)
-				if err != nil {
-					return nil, err
-				}
+	var rel{{$index}} *models.{{$ftable.UpSingular}}
+	rel{{$index}}FKsSet := true
+	if o.r.{{$relAlias}} == nil {
+		if parentModel, found := mInCreation["{{$rel.Foreign}}:{{$table.Key}}:{{$rel.Name}}"]; found {
+			if pModel, ok := parentModel.(*models.{{$ftable.UpSingular}}); ok {
+				rel{{$index}} = pModel
 			}
 		}
-	
+	}
 		{{range $rel.ValuedSides -}}
 			{{- if ne .TableName $table.Key}}{{continue}}{{end -}}
 			{{range .Mapped}}
 				{{- if ne .ExternalTable $rel.Foreign}}{{continue}}{{end -}}
 				{{- $fromColA := index $tAlias.Columns .Column -}}
-				{{- $relIndex := printf "rel%d" $index -}}
-				opt.{{$fromColA}} = {{$.Tables.ColumnAssigner $.CurrentPackage $.Importer $.Types $.Aliases $.Table.Key $rel.Foreign .Column .ExternalColumn $relIndex true}}
+	if o.{{$fromColA}} == nil {
+		rel{{$index}}FKsSet = false
+	}
 			{{end}}
 		{{- end}}
 	{{end}}
+
+	{{- /* Step 2: RequireAll pre-check (relationship is missing only if rel, ancestor model, and FKs are unset) */ -}}
+	{{if $hasRequiredRels -}}
+	if o.requireAll {
+		var missingRels []string
+		{{range $index, $rel := $.Relationships.Get $table.Key -}}
+			{{- if not ($table.RelIsRequired $rel)}}{{continue}}{{end -}}
+			{{- $relAlias := $tAlias.Relationship .Name -}}
+			if o.r.{{$relAlias}} == nil && rel{{$index}} == nil && !rel{{$index}}FKsSet {
+				missingRels = append(missingRels, "{{$relAlias}}")
+			}
+		{{end -}}
+		if len(missingRels) > 0 {
+			return nil, &MissingRequiredFieldsError{
+				TableName: "{{$tAlias.UpSingular}}",
+				Missing:   missingRels,
+			}
+		}
+	}
+	{{end -}}
+
+	{{- /* Step 3: Process required relationships (skip if FK columns already set) */ -}}
+	{{range $index, $rel := $.Relationships.Get $table.Key -}}
+		{{- if not ($table.RelIsRequired $rel)}}{{continue}}{{end -}}
+		{{- $relAlias := $tAlias.Relationship .Name -}}
+		if !rel{{$index}}FKsSet {
+			if rel{{$index}} == nil {
+				if o.r.{{$relAlias}} == nil {
+					{{$tAlias.UpSingular}}Mods.WithNew{{$relAlias}}().Apply(ctx, o)
+				}
+
+				if o.r.{{$relAlias}}.o.alreadyPersisted {
+					rel{{$index}} = o.r.{{$relAlias}}.o.Build()
+				} else {
+					rel{{$index}}, err = o.r.{{$relAlias}}.o.Create(ctx, exec)
+					if err != nil {
+						return nil, err
+					}
+				}
+			}
+
+			{{range $rel.ValuedSides -}}
+				{{- if ne .TableName $table.Key}}{{continue}}{{end -}}
+				{{range .Mapped}}
+					{{- if ne .ExternalTable $rel.Foreign}}{{continue}}{{end -}}
+					{{- $fromColA := index $tAlias.Columns .Column -}}
+					{{- $relIndex := printf "rel%d" $index -}}
+					opt.{{$fromColA}} = {{$.Tables.ColumnAssigner $.CurrentPackage $.Importer $.Types $.Aliases $.Table.Key $rel.Foreign .Column .ExternalColumn $relIndex true}}
+				{{end}}
+			{{- end}}
+		}
+	{{end}}
+
+	if err = ensureCreatable{{$tAlias.UpSingular}}(opt, o.requireAll); err != nil {
+		return nil, err
+	}
 
 	m, err := models.{{$tAlias.UpPlural}}.Insert(opt).One(ctx, exec)
 	if err != nil {
@@ -164,8 +236,6 @@ func (o *{{$tAlias.UpSingular}}Template) Create(ctx context.Context, exec bob.Ex
 
   // Store this model in context for child creates.
   // Key format: "parent_table:child_table:child_rel_name" where child_rel_name is the FK name.
-  // We store an entry for every relationship pointing TO this table (where this table is the parent).
-  // This works regardless of NoBackReferencing since keys use child-side metadata.
   newMInCreation := make(map[string]any, len(mInCreation)+1)
   for k, v := range mInCreation {
     newMInCreation[k] = v
@@ -181,10 +251,11 @@ func (o *{{$tAlias.UpSingular}}Template) Create(ctx context.Context, exec bob.Ex
 
 	{{range $index, $rel := $.Relationships.Get $table.Key -}}
 		{{- if not ($table.RelIsRequired $rel) -}}{{continue}}{{end -}}
-		{{- $ftable := $.Aliases.Table .Foreign -}}
 		{{- $relAlias := $tAlias.Relationship .Name -}}
-		m.R.{{$relAlias}} = rel{{$index}}
-		m.R.{{$.RelationLoadedName}}.{{$relAlias}} = true
+		if rel{{$index}} != nil {
+			m.R.{{$relAlias}} = rel{{$index}}
+			m.R.{{$.RelationLoadedName}}.{{$relAlias}} = true
+		}
 	{{end}}
 
   if err := o.insertOptRels(ctx, exec, m); err != nil {
@@ -216,7 +287,6 @@ func (o *{{$tAlias.UpSingular}}Template) CreateOrFail(ctx context.Context, tb te
   }
 	return m
 }
-
 
 // CreateMany builds multiple {{$tAlias.DownPlural}} and inserts them into the database
 // Relations objects are also inserted and placed in the .R field
