@@ -123,12 +123,27 @@ func (b BaseQuery[E]) Apply(mods ...Mod[E]) {
 	}
 }
 
+func (b BaseQuery[E]) With(mods ...Mod[E]) BaseQuery[E] {
+	clone := b.Clone()
+	clone.Apply(mods...)
+
+	return clone
+}
+
 func (b BaseQuery[E]) WriteQuery(ctx context.Context, w io.StringWriter, start int) ([]any, error) {
 	// If it a query, just call its WriteQuery method
 	if e, ok := any(b.Expression).(interface {
 		WriteQuery(context.Context, io.StringWriter, int) ([]any, error)
 	}); ok {
 		return e.WriteQuery(ctx, w, start)
+	}
+
+	if e, ok := any(b.Expression).(interface {
+		WriteSQLTo(context.Context, io.StringWriter, Dialect, int, *[]any) error
+	}); ok {
+		var args []any
+		err := e.WriteSQLTo(ctx, w, b.Dialect, start, &args)
+		return args, err
 	}
 
 	return b.Expression.WriteSQL(ctx, w, b.Dialect, start)
