@@ -66,7 +66,7 @@ func RunPostgres(ctx context.Context, state *gen.State[any], config Config, plug
 
 func getPsqlDriver(ctx context.Context, config Config) (psqlDriver.Interface, error) {
 	postgresContainer, err := postgres.Run(
-		ctx, "pgvector/pgvector:0.8.2-pg17",
+		ctx, "ghcr.io/payloadcms/postgis-vector:latest",
 		postgres.BasicWaitStrategies(),
 		testcontainers.CustomizeRequest(testcontainers.GenericContainerRequest{
 			ContainerRequest: testcontainers.ContainerRequest{
