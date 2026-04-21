@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	defaultPostgresDriverImage = "pgvector/pgvector:0.8.2-pg17"
+	defaultPostgresDriverImage = "ghcr.io/payloadcms/postgis-vector:latest"
 	defaultMySQLDriverImage    = "mysql:8.0.35"
 )
 
