@@ -27,6 +27,8 @@ func (e *MissingRequiredFieldsError) Error() string {
 
 {{if not $isComponent}}
 type Factory struct {
+    // visited tracks model pointers during FromExisting calls to prevent circular reference stack overflow
+    visited sync.Map
     {{range $table := .Tables}}
     {{ $tAlias := $.Aliases.Table $table.Key -}}
 		base{{$tAlias.UpSingular}}Mods {{$tAlias.UpSingular}}ModSlice
@@ -85,11 +87,11 @@ func (f *Factory) fromExisting{{$tAlias.UpSingular}}(ctx context.Context, m *mod
     {{$relAlias := $tAlias.Relationship .Name -}}
     {{if .IsToMany -}}
       if len(m.R.{{$relAlias}}) > 0 {
-      {{$tAlias.UpSingular}}Mods.AddExisting{{$relAlias}}(m.R.{{$relAlias}}...).Apply(ctx, o)
+      {{$tAlias.UpSingular}}Mods.AddExisting{{$relAlias}}(m.R.{{$relAlias}}...).Apply(context.Background(), o)
       }
     {{- else -}}
       if m.R.{{$relAlias}} != nil {
-      {{$tAlias.UpSingular}}Mods.WithExisting{{$relAlias}}(m.R.{{$relAlias}}).Apply(ctx, o)
+      {{$tAlias.UpSingular}}Mods.WithExisting{{$relAlias}}(m.R.{{$relAlias}}).Apply(context.Background(), o)
       }
     {{- end}}
   {{end}}
