@@ -1,13 +1,7 @@
-{{if $.Relationships.Get .Table.Key -}}
 {{$.Importer.Import "fmt" -}}
-{{$.Importer.Import "context" -}}
-{{$.Importer.Import "github.com/stephenafamo/bob"}}
-{{$.Importer.Import "github.com/stephenafamo/bob/orm" -}}
-{{$.Importer.Import (printf "github.com/stephenafamo/bob/dialect/%s/sm" $.Dialect) -}}
 
 {{$table := .Table}}
 {{$tAlias := .Aliases.Table $table.Key -}}
-
 
 func (o *{{$tAlias.UpSingular}}) Preload(name string, retrieved any) error {
 	if o == nil {
@@ -21,7 +15,7 @@ func (o *{{$tAlias.UpSingular}}) Preload(name string, retrieved any) error {
 	{{- $invRel := $.Relationships.GetInverse . -}}
 	case "{{$relAlias}}":
 		{{if .IsToMany -}}
-			rels, ok := retrieved.({{$fAlias.UpSingular}}Slice)
+			rels, ok := retrieved.({{$.SliceType .Foreign}})
 			if !ok {
 				return fmt.Errorf("{{$tAlias.DownSingular}} cannot load %T as %q", retrieved, name)
 			}
@@ -44,7 +38,7 @@ func (o *{{$tAlias.UpSingular}}) Preload(name string, retrieved any) error {
 			{{- end}}
 			return nil
 		{{else -}}
-			rel, ok := retrieved.(*{{$fAlias.UpSingular}})
+			rel, ok := retrieved.(*{{$.ModelType .Foreign}})
 			if !ok {
 				return fmt.Errorf("{{$tAlias.DownSingular}} cannot load %T as %q", retrieved, name)
 			}
@@ -72,7 +66,13 @@ func (o *{{$tAlias.UpSingular}}) Preload(name string, retrieved any) error {
 	}
 }
 
-type {{$tAlias.DownSingular}}Preloader struct {
+{{if $.Relationships.Get .Table.Key -}}
+{{$.Importer.Import "context" -}}
+{{$.Importer.Import "github.com/stephenafamo/bob"}}
+{{$.Importer.Import "github.com/stephenafamo/bob/orm" -}}
+{{$.Importer.Import (printf "github.com/stephenafamo/bob/dialect/%s/sm" $.Dialect) -}}
+
+type {{$tAlias.UpSingular}}Preloader struct {
   {{range $rel := $.Relationships.Get $table.Key -}}
   {{- if $rel.IsToMany -}}{{continue}}{{- end -}}
   {{- $relAlias := $tAlias.Relationship $rel.Name -}}
@@ -80,25 +80,25 @@ type {{$tAlias.DownSingular}}Preloader struct {
   {{end -}}
 }
 
-func build{{$tAlias.UpSingular}}Preloader() {{$tAlias.DownSingular}}Preloader {
-  return {{$tAlias.DownSingular}}Preloader{
+func Build{{$tAlias.UpSingular}}Preloader() {{$tAlias.UpSingular}}Preloader {
+  return {{$tAlias.UpSingular}}Preloader{
     {{range $rel := $.Relationships.Get $table.Key -}}
     {{- if $rel.IsToMany -}}{{continue}}{{- end -}}
     {{- $relAlias := $tAlias.Relationship $rel.Name -}}
     {{- $fAlias := $.Aliases.Table $rel.Foreign -}}
     {{$relAlias}}: func(opts ...{{$.Dialect}}.PreloadOption) {{$.Dialect}}.Preloader {
-      return {{$.Dialect}}.Preload[*{{$fAlias.UpSingular}}, {{$fAlias.UpSingular}}Slice]({{$.Dialect}}.PreloadRel{
+      return {{$.Dialect}}.Preload[*{{$.ModelType $rel.Foreign}}, {{$.SliceType $rel.Foreign}}]({{$.Dialect}}.PreloadRel{
           Name: "{{$relAlias}}",
           Sides:  []{{$.Dialect}}.PreloadSide{
             {{- $toTable := $table }}{{/* To be able to access the last one after the loop */}}
             {{range $side := $rel.Sides -}}
             {{- $from := $.Aliases.Table $side.From -}}
             {{- $to := $.Aliases.Table $side.To -}}
-            {{- $fromTable := $.Tables.Get $side.From -}}
-            {{- $toTable = $.Tables.Get $side.To -}}
+            {{- $fromTable := $.AllTables.Get $side.From -}}
+            {{- $toTable = $.AllTables.Get $side.To -}}
             {
-              From: {{$from.UpPlural}},
-              To: {{$to.UpPlural}},
+              From: {{$.TableVar $side.From}},
+              To: {{$.TableVar $side.To}},
               {{if $side.FromColumns -}}
               FromColumns: []string{
                 {{- range $name := $side.FromColumns -}}
@@ -138,21 +138,21 @@ func build{{$tAlias.UpSingular}}Preloader() {{$tAlias.DownSingular}}Preloader {
             },
             {{- end}}
           },
-        }, {{$fAlias.UpPlural}}.Columns.Names(), {{$fAlias.DownSingular}}ScanMapperNullable, opts...)
+        }, {{$.TableVar $rel.Foreign}}.Columns.Names(), {{$fAlias.DownSingular}}ScanMapperNullable, opts...)
     },
     {{end -}}
   }
 }
 
 
-type {{$tAlias.DownSingular}}ThenLoader[Q orm.Loadable] struct {
+type {{$tAlias.UpSingular}}ThenLoader[Q orm.Loadable] struct {
   {{range $rel := $.Relationships.Get $table.Key -}}
   {{- $relAlias := $tAlias.Relationship $rel.Name -}}
   {{$relAlias}} func(...bob.Mod[*dialect.SelectQuery]) orm.Loader[Q]
   {{end -}}
 }
 
-func build{{$tAlias.UpSingular}}ThenLoader[Q orm.Loadable]() {{$tAlias.DownSingular}}ThenLoader[Q] {
+func Build{{$tAlias.UpSingular}}ThenLoader[Q orm.Loadable]() {{$tAlias.UpSingular}}ThenLoader[Q] {
   {{range $rel := $.Relationships.Get $table.Key -}}
     {{$relAlias := $tAlias.Relationship $rel.Name -}}
     type {{$relAlias}}LoadInterface interface{
@@ -160,7 +160,7 @@ func build{{$tAlias.UpSingular}}ThenLoader[Q orm.Loadable]() {{$tAlias.DownSingu
     }
   {{end}}
 
-  return {{$tAlias.DownSingular}}ThenLoader[Q]{
+  return {{$tAlias.UpSingular}}ThenLoader[Q]{
     {{range $rel := $.Relationships.Get $table.Key -}}
     {{$relAlias := $tAlias.Relationship $rel.Name -}}
     {{$fAlias := $.Aliases.Table $rel.Foreign -}}
@@ -177,7 +177,7 @@ func build{{$tAlias.UpSingular}}ThenLoader[Q orm.Loadable]() {{$tAlias.DownSingu
 
 
 {{range $rel := $.Relationships.Get $table.Key -}}
-{{- $isToView := $.Tables.RelIsView $rel -}}
+{{- $isToView := $.AllTables.RelIsView $rel -}}
 {{- $fAlias := $.Aliases.Table $rel.Foreign -}}
 {{- $relAlias := $tAlias.Relationship $rel.Name -}}
 {{- $invRel := $.Relationships.GetInverse . -}}
@@ -320,8 +320,8 @@ func (os {{$tAlias.UpSingular}}Slice) Load{{$relAlias}}(ctx context.Context, exe
 		for _, rel := range {{$fAlias.DownPlural}} {
 			{{range $index, $local := $side.FromColumns -}}
         {{- $foreign := index $side.ToColumns $index -}}
-        {{- $fromCol := $.Tables.GetColumn $side.From $local -}}
-        {{- $toCol := $.Tables.GetColumn $side.To $foreign -}}
+        {{- $fromCol := $.AllTables.GetColumn $side.From $local -}}
+        {{- $toCol := $.AllTables.GetColumn $side.To $foreign -}}
 
         {{- $fromColAlias := index $fromAlias.Columns $local -}}
         {{- $toColAlias := index $toAlias.Columns $foreign -}}
@@ -389,7 +389,7 @@ func (os {{$tAlias.UpSingular}}Slice) Load{{$relAlias}}(ctx context.Context, exe
   }
 
 	if len(sq.SelectList.Columns) == 0 {
-		mods = append(mods, sm.Columns({{$fAlias.UpPlural}}.Columns))
+		mods = append(mods, sm.Columns({{$.TableVar $rel.Foreign}}.Columns))
 	}
 
 	q := os.{{relQueryMethodName $tAlias $relAlias}}(append(
@@ -397,13 +397,13 @@ func (os {{$tAlias.UpSingular}}Slice) Load{{$relAlias}}(ctx context.Context, exe
 		{{range $index, $local := $firstSide.FromColumns -}}
 			{{- $toCol := index $firstTo.Columns (index $firstSide.ToColumns $index) -}}
 			{{- $fromCol := index $firstFrom.Columns $local -}}
-			sm.Columns({{$firstTo.UpPlural}}.Columns.{{$toCol}}.As("related_{{$firstSide.From}}.{{$fromCol}}")),
+			sm.Columns({{$.TableVar $firstSide.To}}.Columns.{{$toCol}}.As("related_{{$firstSide.From}}.{{$fromCol}}")),
 		{{- end}}
 	)...)
 
   {{range $index, $local := $firstSide.FromColumns -}}
     {{- $fromColAlias := index $firstFrom.Columns $local -}}
-    {{- $fromCol := $.Tables.GetColumn $firstSide.From $local -}}
+    {{- $fromCol := $.AllTables.GetColumn $firstSide.From $local -}}
     {{- $fromTyp := $.Types.Get $.CurrentPackage $.Importer $fromCol.Type -}}
     {{$fromColAlias}}Slice := []{{$fromTyp}}{}
   {{end}}
@@ -413,7 +413,7 @@ func (os {{$tAlias.UpSingular}}Slice) Load{{$relAlias}}(ctx context.Context, exe
     return func(row *scan.Row) (any, error) {
       {{range $index, $local := $firstSide.FromColumns -}}
         {{- $fromColAlias := index $firstFrom.Columns $local -}}
-        {{- $fromCol := $.Tables.GetColumn $firstSide.From $local -}}
+        {{- $fromCol := $.AllTables.GetColumn $firstSide.From $local -}}
         {{- $fromTyp := $.Types.Get $.CurrentPackage $.Importer $fromCol.Type -}}
         {{$fromColAlias}}Slice = append({{$fromColAlias}}Slice, *new({{$fromTyp}}))
         row.ScheduleScanByName("related_{{$firstSide.From}}.{{$fromColAlias}}", &{{$fromColAlias}}Slice[len({{$fromColAlias}}Slice)-1])
@@ -426,7 +426,7 @@ func (os {{$tAlias.UpSingular}}Slice) Load{{$relAlias}}(ctx context.Context, exe
     }
   })
 
-	{{$fAlias.DownPlural}}, err := bob.Allx[bob.SliceTransformer[*{{$fAlias.UpSingular}}, {{$fAlias.UpSingular}}Slice]](ctx, exec, q, mapper)
+	{{$fAlias.DownPlural}}, err := bob.Allx[bob.SliceTransformer[*{{$.ModelType $rel.Foreign}}, {{$.SliceType $rel.Foreign}}]](ctx, exec, q, mapper)
 	if err != nil {
 		return err
 	}
@@ -500,13 +500,13 @@ func (os {{$tAlias.UpSingular}}Slice) Load{{$relAlias}}(ctx context.Context, exe
 			{{range $index, $local := $firstSide.FromColumns -}}
 			{{- $fromCol := index $firstFrom.Columns $local -}}
       {{- $foreign := index $firstSide.ToColumns $index -}}
-      {{- $fromColDef := $.Tables.GetColumn $firstSide.From $local -}}
-      {{- $toColDef := $.Tables.GetColumn $firstSide.To $foreign -}}
+      {{- $fromColDef := $.AllTables.GetColumn $firstSide.From $local -}}
+      {{- $toColDef := $.AllTables.GetColumn $firstSide.To $foreign -}}
 
       {{- $fromColGet := (printf "o.%s" $fromCol) -}}
       {{- $toColGet := (printf "%sSlice[i]" $fromCol) -}}
 
-			{{- $typInfo := $.Types.Index ($.Tables.GetColumn $firstSide.From $local).Type -}}
+			{{- $typInfo := $.Types.Index ($.AllTables.GetColumn $firstSide.From $local).Type -}}
       {{- with $.Types.GetCompareExpr $.CurrentPackage $.Importer $fromColDef.Type $fromColDef.Nullable $toColDef.Nullable -}}
 				if !({{replace "AAA" $fromColGet . | replace "BBB" $toColGet}}) {
 					continue

@@ -228,6 +228,57 @@ func generateTableOutput[T, C, I any](o *Output, data *TemplateData[T, C, I], ge
 	return nil
 }
 
+func generateSplitModelOutput[T, C, I any](o *Output, data *TemplateData[T, C, I], generator string, noTests bool) error {
+	if data.ModelSplit == nil || !data.ModelSplit.Enabled {
+		return generateTableOutput(o, data, generator, noTests)
+	}
+
+	originalTables := data.Tables
+	originalPkgName := o.PkgName
+	originalOutFolder := o.OutFolder
+	originalGeneration := data.ModelSplit.Generation
+	originalComponent := data.ModelSplit.CurrentComponent
+	defer func() {
+		data.Tables = originalTables
+		o.PkgName = originalPkgName
+		o.OutFolder = originalOutFolder
+		data.ModelSplit.Generation = originalGeneration
+		data.ModelSplit.CurrentComponent = originalComponent
+	}()
+
+	if err := o.initOutFolders(); err != nil {
+		return fmt.Errorf("unable to initialize root model output folder: %w", err)
+	}
+	if err := os.RemoveAll(filepath.Join(o.OutFolder, filepath.FromSlash(data.ModelSplit.InternalDir))); err != nil {
+		return fmt.Errorf("removing old split model output: %w", err)
+	}
+
+	data.Tables = originalTables
+	data.ModelSplit.Generation = modelSplitGenerationFacade
+	data.ModelSplit.CurrentComponent = nil
+	if err := generateSingletonOutput(o, data, generator, noTests); err != nil {
+		return fmt.Errorf("root facade singleton output: %w", err)
+	}
+
+	for _, component := range data.ModelSplit.Components {
+		componentOutput := *o
+		componentOutput.PkgName = component.Package
+		componentOutput.OutFolder = component.OutFolder
+		data.Tables = filterTablesForComponent(originalTables, component)
+		data.ModelSplit.Generation = modelSplitGenerationComponent
+		data.ModelSplit.CurrentComponent = component
+
+		if err := generateSingletonOutput(&componentOutput, data, generator, noTests); err != nil {
+			return fmt.Errorf("component %s singleton output: %w", component.ID, err)
+		}
+		if err := generateTableOutput(&componentOutput, data, generator, noTests); err != nil {
+			return fmt.Errorf("component %s table output: %w", component.ID, err)
+		}
+	}
+
+	return nil
+}
+
 func generateQueryOutput[T, C, I any](o *Output, data *TemplateData[T, C, I], generator string, noTests bool) error {
 	if o.queryTemplates == nil || len(o.queryTemplates.Templates()) == 0 {
 		return nil
@@ -357,6 +408,12 @@ func executeTemplates[T, C, I any](e executeTemplateData[T, C, I], tests bool) e
 		e.data.Language = lang
 		e.data.Importer = lang.Importer()
 		e.data.CurrentPackage = e.data.OutputPackages[e.output.Key]
+		if e.data.ModelSplit != nil &&
+			e.data.ModelSplit.Enabled &&
+			e.data.ModelSplit.Generation == modelSplitGenerationComponent &&
+			e.data.ModelSplit.CurrentComponent != nil {
+			e.data.CurrentPackage = e.data.ModelSplit.CurrentComponent.PackagePath
+		}
 
 		matchingTemplates := 0
 		for _, tplName := range tplNames {
@@ -432,6 +489,12 @@ func executeSingletonTemplates[T, C, I any](e executeTemplateData[T, C, I], test
 		e.data.Language = lang
 		e.data.Importer = lang.Importer()
 		e.data.CurrentPackage = e.data.OutputPackages[e.output.Key]
+		if e.data.ModelSplit != nil &&
+			e.data.ModelSplit.Enabled &&
+			e.data.ModelSplit.Generation == modelSplitGenerationComponent &&
+			e.data.ModelSplit.CurrentComponent != nil {
+			e.data.CurrentPackage = e.data.ModelSplit.CurrentComponent.PackagePath
+		}
 		if err := executeTemplate(out, e.templates, tpl.Name(), e.data); err != nil {
 			return err
 		}
