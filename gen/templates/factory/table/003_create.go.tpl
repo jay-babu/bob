@@ -89,10 +89,14 @@ func (o *{{$tAlias.UpSingular}}Template) insertOptRels(ctx context.Context, exec
               return err
             }
 
+            {{- if not $.RelationshipMutationMethods}}
+            m.R.{{$relAlias}} = append(m.R.{{$relAlias}}, rel{{$index}}...)
+            {{- else}}
             err = m.Attach{{$relAlias}}(ctx, exec, {{$.Tables.RelArgs $.Aliases $rel}} rel{{$index}}...)
             if err != nil {
               return err
             }
+            {{- end}}
 					}
 				}
 		{{- else -}}
@@ -116,10 +120,14 @@ func (o *{{$tAlias.UpSingular}}Template) insertOptRels(ctx context.Context, exec
         if err != nil {
           return err
         }
+        {{- if not $.RelationshipMutationMethods}}
+        m.R.{{$relAlias}} = rel{{$index}}
+        {{- else}}
         err = m.Attach{{$relAlias}}(ctx, exec, {{$.Tables.RelArgs $.Aliases $rel}} rel{{$index}})
         if err != nil {
           return err
         }
+        {{- end}}
 			}
 		{{end}}
 		}

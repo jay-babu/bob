@@ -14,6 +14,11 @@ const selfJoinSuffix = "__self_join_reverse"
 
 type Relationships map[string][]orm.Relationship
 
+const (
+	relationshipCodegenModeAll   = "all"
+	relationshipCodegenModeToOne = "to_one"
+)
+
 // Set parameters of the relationship (unique, nullables, e.t.c.)
 func initRelationships[C, I any](r Relationships, tables drivers.Tables[C, I]) (err error) {
 	defer func() {
@@ -205,6 +210,52 @@ func buildRelationships[C, I any](tables []drivers.Table[C, I]) Relationships {
 	}
 
 	return relationships
+}
+
+func filterGeneratedRelationships[C any](
+	config Config[C],
+	aliases drivers.Aliases,
+	relationships Relationships,
+) (Relationships, error) {
+	mode := config.RelationshipCodegen.Mode
+	if mode == "" {
+		mode = relationshipCodegenModeAll
+	}
+
+	switch mode {
+	case relationshipCodegenModeAll:
+		return relationships, nil
+	case relationshipCodegenModeToOne:
+	default:
+		return nil, fmt.Errorf("unknown relationship_codegen.mode %q", config.RelationshipCodegen.Mode)
+	}
+
+	filtered := make(Relationships, len(relationships))
+	for table, rels := range relationships {
+		for _, rel := range rels {
+			if !rel.IsToMany() || config.allowsToManyRelationship(aliases, table, rel) {
+				filtered[table] = append(filtered[table], rel)
+			}
+		}
+	}
+
+	return filtered, nil
+}
+
+func (c Config[C]) allowsToManyRelationship(aliases drivers.Aliases, table string, rel orm.Relationship) bool {
+	allowed := c.RelationshipCodegen.AllowToMany[table]
+	if len(allowed) == 0 {
+		return false
+	}
+
+	alias := rel.Name
+	if tableAlias, ok := aliases[table]; ok && tableAlias.Relationships != nil {
+		if relAlias, ok := tableAlias.Relationships[rel.Name]; ok {
+			alias = relAlias
+		}
+	}
+
+	return slices.Contains(allowed, alias)
 }
 
 func flipRelationships[C, I any](relMap Relationships, tables []drivers.Table[C, I]) error {

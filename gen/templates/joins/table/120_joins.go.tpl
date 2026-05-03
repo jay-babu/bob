@@ -5,28 +5,28 @@
   {{$.Importer.Import "github.com/stephenafamo/bob/mods"}}
   {{$.Importer.Import (printf "github.com/stephenafamo/bob/dialect/%s/dialect" $.Dialect)}}
 
-  type {{$tAlias.DownSingular}}Joins[Q dialect.Joinable] struct {
+  type {{$tAlias.UpSingular}}Joins[Q dialect.Joinable] struct {
     typ string
     {{range $.Relationships.Get $table.Key -}}
     {{- $relAlias := $tAlias.Relationship .Name -}}
     {{- $fAlias := $.Aliases.Table .Foreign -}}
-    {{$relAlias}} modAs[Q, {{$fAlias.DownSingular}}Columns]
+    {{$relAlias}} ModAs[Q, {{$.ColumnsType .Foreign}}]
     {{end -}}
   }
 
-  func (j {{$tAlias.DownSingular}}Joins[Q]) aliasedAs(alias string) {{$tAlias.DownSingular}}Joins[Q] {
-    return build{{$tAlias.UpSingular}}Joins[Q](build{{$tAlias.UpSingular}}Columns(alias), j.typ)
+  func (j {{$tAlias.UpSingular}}Joins[Q]) AliasedAs(alias string) {{$tAlias.UpSingular}}Joins[Q] {
+    return Build{{$tAlias.UpSingular}}Joins[Q](Build{{$tAlias.UpSingular}}Columns(alias), j.typ)
   }
 
-  func build{{$tAlias.UpSingular}}Joins[Q dialect.Joinable](cols {{$tAlias.DownSingular}}Columns, typ string) {{$tAlias.DownSingular}}Joins[Q] {
-    return {{$tAlias.DownSingular}}Joins[Q]{
+  func Build{{$tAlias.UpSingular}}Joins[Q dialect.Joinable](cols {{$tAlias.UpSingular}}Columns, typ string) {{$tAlias.UpSingular}}Joins[Q] {
+    return {{$tAlias.UpSingular}}Joins[Q]{
       typ: typ,
       {{range $rel := $.Relationships.Get $table.Key -}}
         {{- $fAlias := $.Aliases.Table $rel.Foreign -}}
         {{- $relAlias := $tAlias.Relationship $rel.Name -}}
-        {{$relAlias}}: modAs[Q, {{$fAlias.DownSingular}}Columns] {
-          c: {{$fAlias.UpPlural}}.Columns,
-          f: func(to {{$fAlias.DownSingular}}Columns) bob.Mod[Q] {
+        {{$relAlias}}: ModAs[Q, {{$.ColumnsType $rel.Foreign}}] {
+          c: {{$.TableVar $rel.Foreign}}.Columns,
+          f: func(to {{$.ColumnsType $rel.Foreign}}) bob.Mod[Q] {
             {{if gt (len $rel.Sides) 1 -}}{{$.Importer.Import "strconv" -}}
               random := strconv.FormatInt(randInt(), 10)
             {{- end}}
@@ -34,10 +34,10 @@
 
             {{range $index, $side := $rel.Sides -}}
             {{- $from := $.Aliases.Table $side.From -}}
-            {{- $fromCols := printf "%s.Columns" $from.UpPlural -}}
+            {{- $fromCols := printf "%s.Columns" ($.TableVar $side.From) -}}
             {{- $to := $.Aliases.Table $side.To -}}
-            {{- $toCols := printf "%s.Columns" $to.UpPlural -}}
-            {{- $toTable := $.Tables.Get $side.To -}}
+            {{- $toCols := printf "%s.Columns" ($.TableVar $side.To) -}}
+            {{- $toTable := $.AllTables.Get $side.To -}}
             {
               {{if ne $index 0 -}}
               cols := {{$fromCols}}.AliasedAs({{$fromCols}}.Alias() + random)
@@ -45,7 +45,7 @@
               {{if ne $index (sub (len $rel.Sides) 1) -}}
               to := {{$toCols}}.AliasedAs({{$toCols}}.Alias() + random)
               {{end -}}
-              mods = append(mods, dialect.Join[Q](typ, {{$to.UpPlural}}.Name().As(to.Alias())).On(
+              mods = append(mods, dialect.Join[Q](typ, {{$.TableVar $side.To}}.Name().As(to.Alias())).On(
                   {{range $i, $local := $side.FromColumns -}}
                     {{- $fromCol := index $from.Columns $local -}}
                     {{- $toCol := index $to.Columns (index $side.ToColumns $i) -}}

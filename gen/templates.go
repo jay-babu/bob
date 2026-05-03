@@ -4,6 +4,7 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"path"
 	"strings"
 	"text/template"
 	"unicode"
@@ -84,6 +85,7 @@ type TemplateData[T, C, I any] struct {
 
 	Table         drivers.Table[C, I]
 	Tables        drivers.Tables[C, I]
+	AllTables     drivers.Tables[C, I]
 	TableNames    []string
 	QueryFile     drivers.QueryFile
 	QueryFolder   drivers.QueryFolder
@@ -97,8 +99,10 @@ type TemplateData[T, C, I any] struct {
 	PkgName string
 
 	// Control various generation features
-	NoTests           bool
-	NoBackReferencing bool
+	NoTests                     bool
+	NoBackReferencing           bool
+	SliceMutationMethods        bool
+	RelationshipMutationMethods bool
 
 	// Tags control which tags are added to the struct
 	Tags []string
@@ -117,10 +121,110 @@ type TemplateData[T, C, I any] struct {
 	// Package information
 	CurrentPackage string            // the current package being generated
 	OutputPackages map[string]string // map of output keys to package paths
+	ModelSplit     *ModelSplitData
 
 	// Driver is the module name of the underlying `database/sql` driver
 	Driver   string
 	Language language.Language
+}
+
+func (d *TemplateData[T, C, I]) splitRef(tableKey, name string) string {
+	if d.ModelSplit == nil || !d.ModelSplit.Enabled {
+		return name
+	}
+
+	component := d.ModelSplit.TableComponents[tableKey]
+	if component == nil {
+		return name
+	}
+
+	if d.ModelSplit.Generation == modelSplitGenerationComponent &&
+		d.ModelSplit.CurrentComponent != nil &&
+		component.ID == d.ModelSplit.CurrentComponent.ID {
+		return name
+	}
+
+	d.Importer.Import(component.PackagePath)
+	return path.Base(component.PackagePath) + "." + name
+}
+
+func (d *TemplateData[T, C, I]) TableAlias(tableKey string) drivers.TableAlias {
+	return d.Aliases.Table(tableKey)
+}
+
+func (d *TemplateData[T, C, I]) ModelType(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, alias.UpSingular)
+}
+
+func (d *TemplateData[T, C, I]) SliceType(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, alias.UpSingular+"Slice")
+}
+
+func (d *TemplateData[T, C, I]) SetterType(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, alias.UpSingular+"Setter")
+}
+
+func (d *TemplateData[T, C, I]) QueryType(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, alias.UpPlural+"Query")
+}
+
+func (d *TemplateData[T, C, I]) TableVar(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, alias.UpPlural)
+}
+
+func (d *TemplateData[T, C, I]) ColumnsType(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, alias.UpSingular+"Columns")
+}
+
+func (d *TemplateData[T, C, I]) BuildColumnsFunc(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, "Build"+alias.UpSingular+"Columns")
+}
+
+func (d *TemplateData[T, C, I]) WhereType(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, alias.UpSingular+"Where")
+}
+
+func (d *TemplateData[T, C, I]) BuildWhereFunc(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, "Build"+alias.UpSingular+"Where")
+}
+
+func (d *TemplateData[T, C, I]) JoinType(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, alias.UpSingular+"Joins")
+}
+
+func (d *TemplateData[T, C, I]) BuildJoinFunc(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, "Build"+alias.UpSingular+"Joins")
+}
+
+func (d *TemplateData[T, C, I]) PreloaderType(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, alias.UpSingular+"Preloader")
+}
+
+func (d *TemplateData[T, C, I]) BuildPreloaderFunc(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, "Build"+alias.UpSingular+"Preloader")
+}
+
+func (d *TemplateData[T, C, I]) ThenLoaderType(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, alias.UpSingular+"ThenLoader")
+}
+
+func (d *TemplateData[T, C, I]) BuildThenLoaderFunc(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, "Build"+alias.UpSingular+"ThenLoader")
 }
 
 func loadTemplate(tpl *template.Template, customFuncs template.FuncMap, name, content string) error {
