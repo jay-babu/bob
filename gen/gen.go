@@ -121,26 +121,32 @@ func Run[T, C, I any](ctx context.Context, s *State[C], driver drivers.Interface
 	}
 
 	data := &TemplateData[T, C, I]{
-		Dialect:                       driver.Dialect(),
-		Tables:                        dbInfo.Tables,
-		TableNames:                    tableNames(dbInfo.Tables),
-		QueryFolders:                  dbInfo.QueryFolders,
-		Enums:                         dbInfo.Enums,
-		ExtraInfo:                     dbInfo.ExtraInfo,
-		Aliases:                       s.Config.Aliases,
-		Types:                         types,
-		Relationships:                 relationships,
-		NoTests:                       s.Config.NoTests,
-		NoBackReferencing:             s.Config.NoBackReferencing,
-		NoSliceMutationMethods:        s.Config.NoSliceMutationMethods,
-		NoRelationshipMutationMethods: s.Config.RelationshipCodegen.NoMutationMethods,
-		StructTagCasing:               s.Config.StructTagCasing,
-		TagIgnore:                     make(map[string]struct{}),
-		Tags:                          s.Config.Tags,
-		RelationTag:                   s.Config.RelationTag,
-		EnumFormat:                    s.Config.EnumFormat,
-		OutputPackages:                pkgMap,
-		Driver:                        dbInfo.Driver,
+		Dialect:                     driver.Dialect(),
+		Tables:                      dbInfo.Tables,
+		AllTables:                   dbInfo.Tables,
+		TableNames:                  tableNames(dbInfo.Tables),
+		QueryFolders:                dbInfo.QueryFolders,
+		Enums:                       dbInfo.Enums,
+		ExtraInfo:                   dbInfo.ExtraInfo,
+		Aliases:                     s.Config.Aliases,
+		Types:                       types,
+		Relationships:               relationships,
+		NoTests:                     s.Config.NoTests,
+		NoBackReferencing:           s.Config.NoBackReferencing,
+		SliceMutationMethods:        s.Config.shouldGenerateSliceMutationMethods(),
+		RelationshipMutationMethods: s.Config.RelationshipCodegen.shouldGenerateMutationMethods(),
+		StructTagCasing:             s.Config.StructTagCasing,
+		TagIgnore:                   make(map[string]struct{}),
+		Tags:                        s.Config.Tags,
+		RelationTag:                 s.Config.RelationTag,
+		EnumFormat:                  s.Config.EnumFormat,
+		OutputPackages:              pkgMap,
+		Driver:                      dbInfo.Driver,
+	}
+	if splitData, err := buildModelSplitData(s.Config.ModelPackageSplit, modelsOutFolder(s.Outputs), pkgMap["models"], dbInfo.Tables, relationships); err != nil {
+		return fmt.Errorf("building model package split data: %w", err)
+	} else {
+		data.ModelSplit = splitData
 	}
 
 	for _, v := range s.Config.TagIgnore {
@@ -176,6 +182,13 @@ func generate[T, C, I any](s *State[C], data *TemplateData[T, C, I]) error {
 			return fmt.Errorf("unable to initialize templates: %w", err)
 		}
 
+		if o.Key == "models" && data.ModelSplit != nil && data.ModelSplit.Enabled {
+			if err := generateSplitModelOutput(o, data, s.Config.Generator, s.Config.NoTests); err != nil {
+				return fmt.Errorf("unable to generate split model output: %w", err)
+			}
+			continue
+		}
+
 		// Has a stable output folder
 		if o.OutFolder != "" {
 			if err := generateSingletonOutput(o, data, s.Config.Generator, s.Config.NoTests); err != nil {
@@ -206,6 +219,15 @@ func generate[T, C, I any](s *State[C], data *TemplateData[T, C, I]) error {
 	}
 
 	return nil
+}
+
+func modelsOutFolder(outputs []*Output) string {
+	for _, output := range outputs {
+		if output.Key == "models" {
+			return output.OutFolder
+		}
+	}
+	return ""
 }
 
 // initInflections adds custom inflections to strmangle's ruleset

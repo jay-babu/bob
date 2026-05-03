@@ -21,8 +21,8 @@ type Config[ConstraintExtra any] struct {
 	NoTests bool `yaml:"no_tests"`
 	// Disable back referencing in the loaded relationship structs
 	NoBackReferencing bool `yaml:"no_back_referencing"`
-	// Disable generated bulk mutation helpers on model slices.
-	NoSliceMutationMethods bool `yaml:"no_slice_mutation_methods"`
+	// Generate bulk mutation helpers on model slices. Defaults to true.
+	SliceMutationMethods *bool `yaml:"slice_mutation_methods"`
 	// Decides the casing for go structure tag names. camel, title or snake (default snake)
 	StructTagCasing string `yaml:"struct_tag_casing"`
 	// Relationship struct tag name
@@ -58,8 +58,20 @@ type RelationshipCodegen struct {
 	Mode string `yaml:"mode"`
 	// AllowToMany contains generated Go relationship names keyed by table key.
 	AllowToMany map[string][]string `yaml:"allow_to_many"`
-	// NoMutationMethods disables relationship Insert/Attach/Detach helpers.
-	NoMutationMethods bool `yaml:"no_mutation_methods"`
+	// MutationMethods generates relationship Insert/Attach/Detach helpers. Defaults to true.
+	MutationMethods *bool `yaml:"mutation_methods"`
+}
+
+func boolDefaultTrue(v *bool) bool {
+	return v == nil || *v
+}
+
+func (c Config[C]) shouldGenerateSliceMutationMethods() bool {
+	return boolDefaultTrue(c.SliceMutationMethods)
+}
+
+func (c RelationshipCodegen) shouldGenerateMutationMethods() bool {
+	return boolDefaultTrue(c.MutationMethods)
 }
 
 type ModelPackageSplit struct {

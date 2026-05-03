@@ -34,8 +34,8 @@ type ModelSplitData struct {
 
 type ModelSplitComponent struct {
 	ID          string
-	Package    string
-	OutFolder  string
+	Package     string
+	OutFolder   string
 	PackagePath string
 	TableKeys   []string
 }
@@ -82,7 +82,7 @@ func buildModelSplitData[C, I any](
 
 	for tableKey, rels := range relationships {
 		for _, rel := range rels {
-			addEdge(tableKey, rel.Foreign)
+			addEdge(tableKey, rel.Foreign())
 			for _, side := range rel.Sides {
 				addEdge(tableKey, side.From)
 				addEdge(tableKey, side.To)

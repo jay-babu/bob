@@ -11,7 +11,7 @@ var Preload = getPreloaders()
 type preloaders struct {
 		{{range $table := .Tables -}}{{if $.Relationships.Get $table.Key -}}
 		{{$tAlias := $.Aliases.Table $table.Key -}}
-		{{$tAlias.UpSingular}} {{$tAlias.DownSingular}}Preloader
+		{{$tAlias.UpSingular}} {{$.PreloaderType $table.Key}}
 		{{end}}{{end}}
 }
 
@@ -19,7 +19,7 @@ func getPreloaders() preloaders {
 	return preloaders{
 		{{range $table := .Tables -}}{{if $.Relationships.Get $table.Key -}}
 		{{$tAlias := $.Aliases.Table $table.Key -}}
-		{{$tAlias.UpSingular}}: build{{$tAlias.UpSingular}}Preloader(),
+		{{$tAlias.UpSingular}}: {{$.BuildPreloaderFunc $table.Key}}(),
 		{{end}}{{end}}
 	}
 }
@@ -35,7 +35,7 @@ var (
 type thenLoaders[Q orm.Loadable] struct {
 		{{range $table := .Tables -}}{{if $.Relationships.Get $table.Key -}}
 		{{$tAlias := $.Aliases.Table $table.Key -}}
-		{{$tAlias.UpSingular}} {{$tAlias.DownSingular}}ThenLoader[Q]
+		{{$tAlias.UpSingular}} {{$.ThenLoaderType $table.Key}}[Q]
 		{{end}}{{end}}
 }
 
@@ -43,7 +43,7 @@ func getThenLoaders[Q orm.Loadable]() thenLoaders[Q] {
 	return thenLoaders[Q]{
 		{{range $table := .Tables -}}{{if $.Relationships.Get $table.Key -}}
 		{{$tAlias := $.Aliases.Table $table.Key -}}
-		{{$tAlias.UpSingular}}: build{{$tAlias.UpSingular}}ThenLoader[Q](),
+		{{$tAlias.UpSingular}}: {{$.BuildThenLoaderFunc $table.Key}}[Q](),
 		{{end}}{{end}}
 	}
 }
@@ -68,4 +68,3 @@ func thenLoadBuilder[Q orm.Loadable, T any](name string, f func(context.Context,
     }
   }
 }
-

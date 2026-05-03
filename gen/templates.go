@@ -99,10 +99,10 @@ type TemplateData[T, C, I any] struct {
 	PkgName string
 
 	// Control various generation features
-	NoTests                       bool
-	NoBackReferencing             bool
-	NoSliceMutationMethods        bool
-	NoRelationshipMutationMethods bool
+	NoTests                     bool
+	NoBackReferencing           bool
+	SliceMutationMethods        bool
+	RelationshipMutationMethods bool
 
 	// Tags control which tags are added to the struct
 	Tags []string

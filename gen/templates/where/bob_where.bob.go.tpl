@@ -13,19 +13,18 @@ var (
 func Where[Q {{$.Dialect}}.Filterable]() struct {
 	{{range $table := .Tables -}}
 	{{$tAlias := $.Aliases.Table $table.Key -}}
-	{{$tAlias.UpPlural}} {{$tAlias.DownSingular}}Where[Q]
+	{{$tAlias.UpPlural}} {{$.WhereType $table.Key}}[Q]
 	{{end -}}
 } {
 	return struct {
 		{{range $table := .Tables -}}
 		{{$tAlias := $.Aliases.Table $table.Key -}}
-		{{$tAlias.UpPlural}} {{$tAlias.DownSingular}}Where[Q]
+		{{$tAlias.UpPlural}} {{$.WhereType $table.Key}}[Q]
 		{{end -}}
 	}{
 		{{range $table := .Tables -}}
 		{{$tAlias := $.Aliases.Table $table.Key -}}
-		{{$tAlias.UpPlural}}: build{{$tAlias.UpSingular}}Where[Q]({{$tAlias.UpPlural}}.Columns),
+		{{$tAlias.UpPlural}}: {{$.BuildWhereFunc $table.Key}}[Q]({{$.TableVar $table.Key}}.Columns),
 		{{end -}}
 	}
 }
-

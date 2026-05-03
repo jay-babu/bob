@@ -9,37 +9,37 @@
 {{- $fAlias := $.Aliases.Table $rel.Foreign -}}
 {{- $relAlias := $tAlias.Relationship $rel.Name -}}
 // {{$relAlias}} starts a query for related objects on {{$rel.Foreign}}
-func (o *{{$tAlias.UpSingular}}) {{relQueryMethodName $tAlias $relAlias}}(mods ...bob.Mod[*dialect.SelectQuery]) {{$fAlias.UpPlural}}Query {
-	return {{$fAlias.UpPlural}}.Query(append(mods,
+func (o *{{$tAlias.UpSingular}}) {{relQueryMethodName $tAlias $relAlias}}(mods ...bob.Mod[*dialect.SelectQuery]) {{$.QueryType $rel.Foreign}} {
+	return {{$.TableVar $rel.Foreign}}.Query(append(mods,
 		{{- range $index := until (len $rel.Sides) | reverse -}}
 		{{/* Index counts down */}}
 		{{/* This also flips the meaning of $from and $to */}}
 		{{- $side := index $rel.Sides $index -}}
 		{{- $from := $.Aliases.Table $side.From -}}
 		{{- $to := $.Aliases.Table $side.To -}}
-		{{- $fromTable := $.Tables.Get $side.From -}}
+		{{- $fromTable := $.AllTables.Get $side.From -}}
 		{{- if gt $index 0 -}}
-		sm.InnerJoin({{$from.UpPlural}}.NameAs()).On(
+		sm.InnerJoin({{$.TableVar $side.From}}.NameAs()).On(
 		{{end -}}
 			{{range $i, $local := $side.FromColumns -}}
 				{{- $fromCol := index $from.Columns $local -}}
 				{{- $toCol := index $to.Columns (index $side.ToColumns $i) -}}
 				{{- if gt $index 0 -}}
-				{{$to.UpPlural}}.Columns.{{$toCol}}.EQ({{$from.UpPlural}}.Columns.{{$fromCol}}),
+				{{$.TableVar $side.To}}.Columns.{{$toCol}}.EQ({{$.TableVar $side.From}}.Columns.{{$fromCol}}),
 				{{- else -}}
-				sm.Where({{$to.UpPlural}}.Columns.{{$toCol}}.EQ({{$.Dialect}}.Arg(o.{{$fromCol}}))),
+				sm.Where({{$.TableVar $side.To}}.Columns.{{$toCol}}.EQ({{$.Dialect}}.Arg(o.{{$fromCol}}))),
 				{{- end -}}
 			{{- end}}
 			{{- range $where := $side.FromWhere}}
 				{{- $fromCol := index $from.Columns $where.Column}}
 				{{if eq $index 0 -}}sm.Where({{end -}}
-				{{$from.UpPlural}}.Columns.{{$fromCol}}.EQ({{$.Dialect}}.Arg({{quote $where.SQLValue}})),
+				{{$.TableVar $side.From}}.Columns.{{$fromCol}}.EQ({{$.Dialect}}.Arg({{quote $where.SQLValue}})),
 				{{- if eq $index 0 -}}),{{- end -}}
 			{{- end}}
 			{{- range $where := $side.ToWhere}}
 				{{- $toCol := index $to.Columns $where.Column}}
 				{{if eq $index 0 -}}sm.Where({{end -}}
-				{{$to.UpPlural}}.Columns.{{$toCol}}.EQ({{$.Dialect}}.Arg({{quote $where.SQLValue}})),
+				{{$.TableVar $side.To}}.Columns.{{$toCol}}.EQ({{$.Dialect}}.Arg({{quote $where.SQLValue}})),
 				{{- if eq $index 0 -}}),{{- end -}}
 			{{- end}}
 		{{- if gt $index 0 -}}
@@ -57,7 +57,7 @@ func (o *{{$tAlias.UpSingular}}) {{relQueryMethodName $tAlias $relAlias}}(mods .
 {{$lastFrom := $.Aliases.Table $lastSide.From -}}
 {{$lastTo := $.Aliases.Table $lastSide.To -}}
 
-func (os {{$tAlias.UpSingular}}Slice) {{relQueryMethodName $tAlias $relAlias}}(mods ...bob.Mod[*dialect.SelectQuery]) {{$fAlias.UpPlural}}Query {
+func (os {{$tAlias.UpSingular}}Slice) {{relQueryMethodName $tAlias $relAlias}}(mods ...bob.Mod[*dialect.SelectQuery]) {{$.QueryType $rel.Foreign}} {
   {{if gt (len $firstSide.FromColumns) 0 -}}
   {{if (ne $.Dialect "psql")}}
     PKArgSlice := make([]bob.Expression, len(os))
@@ -98,29 +98,29 @@ func (os {{$tAlias.UpSingular}}Slice) {{relQueryMethodName $tAlias $relAlias}}(m
 	{{- end}}
 
 
-	return {{$fAlias.UpPlural}}.Query(append(mods,
+	return {{$.TableVar $rel.Foreign}}.Query(append(mods,
 		{{- range $index := until (len $rel.Sides) | reverse -}}
 		{{/* Index counts down */}}
 		{{/* This also flips the meaning of $from and $to */}}
 		{{- $side := index $rel.Sides $index -}}
 		{{- $from := $.Aliases.Table $side.From -}}
 		{{- $to := $.Aliases.Table $side.To -}}
-		{{- $fromTable := $.Tables.Get $side.From -}}
+		{{- $fromTable := $.AllTables.Get $side.From -}}
 		{{- if gt $index 0 -}}
-		sm.InnerJoin({{$from.UpPlural}}.NameAs()).On(
+		sm.InnerJoin({{$.TableVar $side.From}}.NameAs()).On(
 			{{range $i, $local := $side.FromColumns -}}
 				{{- $foreign := index $side.ToColumns $i -}}
 				{{- $fromCol := index $from.Columns $local -}}
 				{{- $toCol := index $to.Columns $foreign -}}
-				{{$to.UpPlural}}.Columns.{{$toCol}}.EQ({{$from.UpPlural}}.Columns.{{$fromCol}}),
+				{{$.TableVar $side.To}}.Columns.{{$toCol}}.EQ({{$.TableVar $side.From}}.Columns.{{$fromCol}}),
 			{{- end}}
 			{{- range $where := $side.FromWhere}}
 				{{- $fromCol := index $from.Columns $where.Column}}
-				{{$from.UpPlural}}.Columns.{{$fromCol}}.EQ({{$.Dialect}}.Arg({{quote $where.SQLValue}})),
+				{{$.TableVar $side.From}}.Columns.{{$fromCol}}.EQ({{$.Dialect}}.Arg({{quote $where.SQLValue}})),
 			{{- end}}
 			{{- range $where := $side.ToWhere}}
 				{{- $toCol := index $to.Columns $where.Column}}
-				{{$to.UpPlural}}.Columns.{{$toCol}}.EQ({{$.Dialect}}.Arg({{quote $where.SQLValue}})),
+				{{$.TableVar $side.To}}.Columns.{{$toCol}}.EQ({{$.Dialect}}.Arg({{quote $where.SQLValue}})),
 			{{- end}}
 		),
 		{{- else -}}
@@ -129,16 +129,16 @@ func (os {{$tAlias.UpSingular}}Slice) {{relQueryMethodName $tAlias $relAlias}}(m
 				{{- range $index, $local := $side.FromColumns -}}
 					{{- $fromCol := index $from.Columns $local -}}
 					{{- $toCol := index $to.Columns (index $side.ToColumns $index) -}}
-					{{$to.UpPlural}}.Columns.{{$toCol}},
+					{{$.TableVar $side.To}}.Columns.{{$toCol}},
 				{{- end}}).OP("IN", PKArgExpr)),
 			{{- end}}
 			{{- range $where := $side.FromWhere}}
 				{{- $fromCol := index $from.Columns $where.Column}}
-				sm.Where({{$from.UpPlural}}.Columns.{{$fromCol}}.EQ({{$.Dialect}}.Arg({{quote $where.SQLValue}}))),
+				sm.Where({{$.TableVar $side.From}}.Columns.{{$fromCol}}.EQ({{$.Dialect}}.Arg({{quote $where.SQLValue}}))),
 			{{- end}}
 			{{- range $where := $side.ToWhere}}
 				{{- $toCol := index $to.Columns $where.Column}}
-				sm.Where({{$to.UpPlural}}.Columns.{{$toCol}}.EQ({{$.Dialect}}.Arg({{quote $where.SQLValue}}))),
+				sm.Where({{$.TableVar $side.To}}.Columns.{{$toCol}}.EQ({{$.Dialect}}.Arg({{quote $where.SQLValue}}))),
 			{{- end}}
 		{{- end -}}
 		{{- end}}

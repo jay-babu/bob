@@ -103,7 +103,7 @@ func TestRelationshipMutationMethodsTemplateCanBeDisabled(t *testing.T) {
 				Primary: &drivers.Constraint[any]{Columns: []string{"id"}},
 			},
 		},
-		NoRelationshipMutationMethods: true,
+		RelationshipMutationMethods: false,
 	}
 
 	var out bytes.Buffer
@@ -145,7 +145,7 @@ func TestSliceMutationMethodsTemplateCanBeDisabled(t *testing.T) {
 				UpSingular: "Widget",
 			},
 		},
-		NoSliceMutationMethods: true,
+		SliceMutationMethods: false,
 	}
 
 	var out bytes.Buffer

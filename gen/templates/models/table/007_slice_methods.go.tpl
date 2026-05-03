@@ -24,7 +24,7 @@ func (o {{$tAlias.UpSingular}}Slice) AfterQueryHook(ctx context.Context, exec bo
 	return err
 }
 
-{{if and .Table.Constraints.Primary (not $.NoSliceMutationMethods) -}}
+{{if and .Table.Constraints.Primary $.SliceMutationMethods -}}
 {{$.Importer.Import (printf "github.com/stephenafamo/bob/dialect/%s/sm" $.Dialect)}}
 {{$.Importer.Import (printf "github.com/stephenafamo/bob/dialect/%s/dialect" $.Dialect)}}
 
