@@ -33,12 +33,12 @@ type {{$tAlias.UpSingular}}Slice []*{{$tAlias.UpSingular}}
 {{$tAlias := .Aliases.Table $table.Key -}}
 {{if not $table.Constraints.Primary -}}
 	// {{$tAlias.UpPlural}} contains methods to work with the {{$table.Name}} view
-	var {{$tAlias.UpPlural}} = {{$.Dialect}}.NewViewx[*{{$tAlias.UpSingular}}, {{$tAlias.UpSingular}}Slice]("{{$table.Schema}}","{{$table.Name}}",build{{$tAlias.UpSingular}}Columns({{quote (tableColumnAlias $table.Schema $table.Name $table.Key)}}), {{$tAlias.DownSingular}}ScanMapper)
+	var {{$tAlias.UpPlural}} = {{$.Dialect}}.NewViewx[*{{$tAlias.UpSingular}}, {{$tAlias.UpSingular}}Slice]("{{$table.Schema}}","{{$table.Name}}",Build{{$tAlias.UpSingular}}Columns({{quote (tableColumnAlias $table.Schema $table.Name $table.Key)}}), {{$tAlias.DownSingular}}ScanMapper)
 	// {{$tAlias.UpPlural}}Query is a query on the {{$table.Name}} view
 	type {{$tAlias.UpPlural}}Query = *{{$.Dialect}}.ViewQuery[*{{$tAlias.UpSingular}}, {{$tAlias.UpSingular}}Slice]
 {{- else -}}
 	// {{$tAlias.UpPlural}} contains methods to work with the {{$table.Name}} table
-	var {{$tAlias.UpPlural}} = {{$.Dialect}}.NewTablex[*{{$tAlias.UpSingular}}, {{$tAlias.UpSingular}}Slice, *{{$tAlias.UpSingular}}Setter]("{{$table.Schema}}","{{$table.Name}}",build{{$tAlias.UpSingular}}Columns({{quote (tableColumnAlias $table.Schema $table.Name $table.Key)}}), {{$tAlias.DownSingular}}ScanMapper)
+	var {{$tAlias.UpPlural}} = {{$.Dialect}}.NewTablex[*{{$tAlias.UpSingular}}, {{$tAlias.UpSingular}}Slice, *{{$tAlias.UpSingular}}Setter]("{{$table.Schema}}","{{$table.Name}}",Build{{$tAlias.UpSingular}}Columns({{quote (tableColumnAlias $table.Schema $table.Name $table.Key)}}), {{$tAlias.DownSingular}}ScanMapper)
 	// {{$tAlias.UpPlural}}Query is a query on the {{$table.Name}} table
 	type {{$tAlias.UpPlural}}Query = *{{$.Dialect}}.ViewQuery[*{{$tAlias.UpSingular}}, {{$tAlias.UpSingular}}Slice]
 {{- end}}
@@ -52,9 +52,9 @@ type {{$tAlias.DownSingular}}R struct {
 	{{- $ftable := $.Aliases.Table .Foreign -}}
 	{{- $relAlias := $tAlias.Relationship .Name -}}
 	{{if .IsToMany -}}
-		{{$relAlias}} {{$ftable.UpSingular}}Slice {{if $.Tags}}`{{generateTags $.Tags $relAlias | trim}}`{{end}} // {{.Name}}
+		{{$relAlias}} {{$.SliceType .Foreign}} {{if $.Tags}}`{{generateTags $.Tags $relAlias | trim}}`{{end}} // {{.Name}}
 	{{else -}}
-		{{$relAlias}} *{{$ftable.UpSingular}} {{if $.Tags}}`{{generateTags $.Tags $relAlias | trim}}`{{end}} // {{.Name}}
+		{{$relAlias}} *{{$.ModelType .Foreign}} {{if $.Tags}}`{{generateTags $.Tags $relAlias | trim}}`{{end}} // {{.Name}}
 	{{end}}{{end -}}
 
 	// {{$.RelationLoadedName}} reports whether each relationship has been loaded.
@@ -74,7 +74,7 @@ type {{$tAlias.DownSingular}}R{{$.RelationLoadedName}} struct {
 
 {{$.Importer.Import "github.com/stephenafamo/bob/expr"}}
 {{$.Importer.Import (printf "github.com/stephenafamo/bob/dialect/%s" $.Dialect)}}
-func build{{$tAlias.UpSingular}}Columns(tableName string) {{$tAlias.DownSingular}}Columns {
+func Build{{$tAlias.UpSingular}}Columns(tableName string) {{$tAlias.UpSingular}}Columns {
   columnsExpr := expr.NewColumnsExpr(
     {{range $column := $table.Columns -}}{{quote $column.Name}},{{end}}
   )
@@ -83,7 +83,7 @@ func build{{$tAlias.UpSingular}}Columns(tableName string) {{$tAlias.DownSingular
     columnsExpr = columnsExpr.WithParent(tableName)
   }
 
-  return {{$tAlias.DownSingular}}Columns{
+  return {{$tAlias.UpSingular}}Columns{
     ColumnsExpr: columnsExpr,
     tableAlias: tableName,
     {{range $column := $table.Columns -}}
@@ -93,7 +93,7 @@ func build{{$tAlias.UpSingular}}Columns(tableName string) {{$tAlias.DownSingular
   }
 }
 
-type {{$tAlias.DownSingular}}Columns struct {
+type {{$tAlias.UpSingular}}Columns struct {
   expr.ColumnsExpr
   tableAlias string
 	{{range $column := $table.Columns -}}
@@ -103,18 +103,18 @@ type {{$tAlias.DownSingular}}Columns struct {
 }
 
 // Alias returns the current table alias for the columns set.
-func (c {{$tAlias.DownSingular}}Columns) Alias() string {
+func (c {{$tAlias.UpSingular}}Columns) Alias() string {
   return c.tableAlias
 }
 
 // AliasedAs returns a copy of the columns set qualified by tableName.
-func ({{$tAlias.DownSingular}}Columns) AliasedAs(tableName string) {{$tAlias.DownSingular}}Columns {
-  return build{{$tAlias.UpSingular}}Columns(tableName)
+func ({{$tAlias.UpSingular}}Columns) AliasedAs(tableName string) {{$tAlias.UpSingular}}Columns {
+  return Build{{$tAlias.UpSingular}}Columns(tableName)
 }
 
 // Unqualified returns a copy of the columns set without table qualification.
-func (c {{$tAlias.DownSingular}}Columns) Unqualified() {{$tAlias.DownSingular}}Columns {
-  return build{{$tAlias.UpSingular}}Columns("")
+func (c {{$tAlias.UpSingular}}Columns) Unqualified() {{$tAlias.UpSingular}}Columns {
+  return Build{{$tAlias.UpSingular}}Columns("")
 }
 
 func build{{$tAlias.UpSingular}}Column(alias, name string) {{$tAlias.DownSingular}}Column {

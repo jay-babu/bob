@@ -3,8 +3,8 @@
 {{$table := .Table}}
 {{$tAlias := .Aliases.Table $table.Key -}}
 
-type {{$tAlias.DownSingular}}Where[Q {{$.Dialect}}.Filterable] struct {
-	cols {{$tAlias.DownSingular}}Columns
+type {{$tAlias.UpSingular}}Where[Q {{$.Dialect}}.Filterable] struct {
+	cols {{$tAlias.UpSingular}}Columns
 	{{range $column := $table.Columns -}}
     {{- $colAlias := $tAlias.Column $column.Name -}}
     {{- $colTyp := $.Types.Get $.CurrentPackage $.Importer $column.Type -}}
@@ -19,12 +19,12 @@ type {{$tAlias.DownSingular}}Where[Q {{$.Dialect}}.Filterable] struct {
   {{end -}}
 }
 
-func ({{$tAlias.DownSingular}}Where[Q]) AliasedAs(alias string) {{$tAlias.DownSingular}}Where[Q] {
-	return build{{$tAlias.UpSingular}}Where[Q](build{{$tAlias.UpSingular}}Columns(alias))
+func ({{$tAlias.UpSingular}}Where[Q]) AliasedAs(alias string) {{$tAlias.UpSingular}}Where[Q] {
+	return Build{{$tAlias.UpSingular}}Where[Q](Build{{$tAlias.UpSingular}}Columns(alias))
 }
 
-func build{{$tAlias.UpSingular}}Where[Q {{$.Dialect}}.Filterable](cols {{$tAlias.DownSingular}}Columns) {{$tAlias.DownSingular}}Where[Q] {
-	return {{$tAlias.DownSingular}}Where[Q]{
+func Build{{$tAlias.UpSingular}}Where[Q {{$.Dialect}}.Filterable](cols {{$tAlias.UpSingular}}Columns) {{$tAlias.UpSingular}}Where[Q] {
+	return {{$tAlias.UpSingular}}Where[Q]{
 			cols: cols,
 			{{range $column := $table.Columns -}}
       {{- $colAlias := $tAlias.Column $column.Name -}}
@@ -46,7 +46,7 @@ func build{{$tAlias.UpSingular}}Where[Q {{$.Dialect}}.Filterable](cols {{$tAlias
 // {{$tAlias.DownSingular}}Where under the R namespace — mirroring the model's
 // R struct — so they cannot collide with column-based filter fields.
 type {{$tAlias.DownSingular}}WhereR[Q {{$.Dialect}}.Filterable] struct {
-	cols {{$tAlias.DownSingular}}Columns
+	cols {{$tAlias.UpSingular}}Columns
 }
 {{end -}}
 
