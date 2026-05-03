@@ -112,29 +112,35 @@ func Run[T, C, I any](ctx context.Context, s *State[C], driver drivers.Interface
 	if err := initAliases(s.Config.Aliases, dbInfo.Tables, relationships); err != nil {
 		return fmt.Errorf("initializing aliases: %w\nSee: https://bob.stephenafamo.com/docs/code-generation/configuration#aliases", err)
 	}
+	relationships, err = filterGeneratedRelationships(s.Config, s.Config.Aliases, relationships)
+	if err != nil {
+		return fmt.Errorf("filtering relationships: %w", err)
+	}
 	if err = s.initTags(); err != nil {
 		return fmt.Errorf("unable to initialize struct tags: %w", err)
 	}
 
 	data := &TemplateData[T, C, I]{
-		Dialect:           driver.Dialect(),
-		Tables:            dbInfo.Tables,
-		TableNames:        tableNames(dbInfo.Tables),
-		QueryFolders:      dbInfo.QueryFolders,
-		Enums:             dbInfo.Enums,
-		ExtraInfo:         dbInfo.ExtraInfo,
-		Aliases:           s.Config.Aliases,
-		Types:             types,
-		Relationships:     relationships,
-		NoTests:           s.Config.NoTests,
-		NoBackReferencing: s.Config.NoBackReferencing,
-		StructTagCasing:   s.Config.StructTagCasing,
-		TagIgnore:         make(map[string]struct{}),
-		Tags:              s.Config.Tags,
-		RelationTag:       s.Config.RelationTag,
-		EnumFormat:        s.Config.EnumFormat,
-		OutputPackages:    pkgMap,
-		Driver:            dbInfo.Driver,
+		Dialect:                       driver.Dialect(),
+		Tables:                        dbInfo.Tables,
+		TableNames:                    tableNames(dbInfo.Tables),
+		QueryFolders:                  dbInfo.QueryFolders,
+		Enums:                         dbInfo.Enums,
+		ExtraInfo:                     dbInfo.ExtraInfo,
+		Aliases:                       s.Config.Aliases,
+		Types:                         types,
+		Relationships:                 relationships,
+		NoTests:                       s.Config.NoTests,
+		NoBackReferencing:             s.Config.NoBackReferencing,
+		NoSliceMutationMethods:        s.Config.NoSliceMutationMethods,
+		NoRelationshipMutationMethods: s.Config.RelationshipCodegen.NoMutationMethods,
+		StructTagCasing:               s.Config.StructTagCasing,
+		TagIgnore:                     make(map[string]struct{}),
+		Tags:                          s.Config.Tags,
+		RelationTag:                   s.Config.RelationTag,
+		EnumFormat:                    s.Config.EnumFormat,
+		OutputPackages:                pkgMap,
+		Driver:                        dbInfo.Driver,
 	}
 
 	for _, v := range s.Config.TagIgnore {

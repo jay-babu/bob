@@ -1,4 +1,4 @@
-{{if .Table.Constraints.Primary -}}
+{{if and .Table.Constraints.Primary (not $.NoRelationshipMutationMethods) -}}
 {{$table := .Table}}
 {{$tAlias := .Aliases.Table $table.Key -}}
 

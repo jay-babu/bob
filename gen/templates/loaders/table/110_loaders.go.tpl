@@ -1,13 +1,7 @@
-{{if $.Relationships.Get .Table.Key -}}
 {{$.Importer.Import "fmt" -}}
-{{$.Importer.Import "context" -}}
-{{$.Importer.Import "github.com/stephenafamo/bob"}}
-{{$.Importer.Import "github.com/stephenafamo/bob/orm" -}}
-{{$.Importer.Import (printf "github.com/stephenafamo/bob/dialect/%s/sm" $.Dialect) -}}
 
 {{$table := .Table}}
 {{$tAlias := .Aliases.Table $table.Key -}}
-
 
 func (o *{{$tAlias.UpSingular}}) Preload(name string, retrieved any) error {
 	if o == nil {
@@ -67,6 +61,12 @@ func (o *{{$tAlias.UpSingular}}) Preload(name string, retrieved any) error {
 		return fmt.Errorf("{{$tAlias.DownSingular}} has no relationship %q", name)
 	}
 }
+
+{{if $.Relationships.Get .Table.Key -}}
+{{$.Importer.Import "context" -}}
+{{$.Importer.Import "github.com/stephenafamo/bob"}}
+{{$.Importer.Import "github.com/stephenafamo/bob/orm" -}}
+{{$.Importer.Import (printf "github.com/stephenafamo/bob/dialect/%s/sm" $.Dialect) -}}
 
 type {{$tAlias.DownSingular}}Preloader struct {
   {{range $rel := $.Relationships.Get $table.Key -}}
