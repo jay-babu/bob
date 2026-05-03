@@ -13,6 +13,7 @@ import (
 	"github.com/stephenafamo/bob/gen/drivers"
 	"github.com/stephenafamo/bob/gen/language"
 	"github.com/stephenafamo/bob/internal"
+	"github.com/stephenafamo/bob/orm"
 	"github.com/volatiletech/strmangle"
 )
 
@@ -225,6 +226,46 @@ func (d *TemplateData[T, C, I]) ThenLoaderType(tableKey string) string {
 func (d *TemplateData[T, C, I]) BuildThenLoaderFunc(tableKey string) string {
 	alias := d.TableAlias(tableKey)
 	return d.splitRef(tableKey, "Build"+alias.UpSingular+"ThenLoader")
+}
+
+func (d *TemplateData[T, C, I]) CountPreloaderType(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, alias.UpSingular+"CountPreloader")
+}
+
+func (d *TemplateData[T, C, I]) BuildCountPreloaderFunc(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, "Build"+alias.UpSingular+"CountPreloader")
+}
+
+func (d *TemplateData[T, C, I]) CountThenLoaderType(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, alias.UpSingular+"CountThenLoader")
+}
+
+func (d *TemplateData[T, C, I]) BuildCountThenLoaderFunc(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, "Build"+alias.UpSingular+"CountThenLoader")
+}
+
+func (d *TemplateData[T, C, I]) RelDependenciesPos(r orm.Relationship) string {
+	needed := d.AllTables.NeededBridgeRels(r)
+	ma := make([]string, len(needed))
+
+	for i, need := range needed {
+		alias := d.TableAlias(need.Table)
+		if need.Many {
+			ma[i] = fmt.Sprintf(
+				"%s%d %s,", alias.DownPlural, need.Position, d.SliceType(need.Table),
+			)
+		} else {
+			ma[i] = fmt.Sprintf(
+				"%s%d *%s,", alias.DownSingular, need.Position, d.ModelType(need.Table),
+			)
+		}
+	}
+
+	return strings.Join(ma, "")
 }
 
 func loadTemplate(tpl *template.Template, customFuncs template.FuncMap, name, content string) error {

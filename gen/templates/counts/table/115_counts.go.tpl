@@ -41,7 +41,7 @@ func (o *{{$tAlias.UpSingular}}) PreloadCount(name string, count int64) error {
 	return nil
 }
 
-type {{$tAlias.DownSingular}}CountPreloader struct {
+type {{$tAlias.UpSingular}}CountPreloader struct {
 	{{range $rel := $rels -}}
 	{{- if not $rel.IsToMany}}{{continue}}{{end -}}
 	{{- $relAlias := $tAlias.Relationship $rel.Name -}}
@@ -49,8 +49,8 @@ type {{$tAlias.DownSingular}}CountPreloader struct {
 	{{end -}}
 }
 
-func build{{$tAlias.UpSingular}}CountPreloader() {{$tAlias.DownSingular}}CountPreloader {
-	return {{$tAlias.DownSingular}}CountPreloader{
+func Build{{$tAlias.UpSingular}}CountPreloader() {{$tAlias.UpSingular}}CountPreloader {
+	return {{$tAlias.UpSingular}}CountPreloader{
 		{{range $rel := $rels -}}
 		{{- if not $rel.IsToMany}}{{continue}}{{end -}}
 		{{- $relAlias := $tAlias.Relationship $rel.Name -}}
@@ -59,7 +59,7 @@ func build{{$tAlias.UpSingular}}CountPreloader() {{$tAlias.DownSingular}}CountPr
 			return countPreloader[*{{$tAlias.UpSingular}}]("{{$relAlias}}", func(parent string) bob.Expression {
 				// Build a correlated subquery: (SELECT COUNT(*) FROM related WHERE fk = parent.pk)
 				if parent == "" {
-					parent = {{$tAlias.UpPlural}}.Alias()
+					parent = {{$.TableVar $table.Key}}.Alias()
 				}
 				{{$firstSide := index $rel.Sides 0 -}}
 				{{$fromAlias := $.Aliases.Table $firstSide.From -}}
@@ -69,27 +69,27 @@ func build{{$tAlias.UpSingular}}CountPreloader() {{$tAlias.DownSingular}}CountPr
 					sm.Columns({{$.Dialect}}.Raw("count(*)")),
 					{{- if eq (len $rel.Sides) 1}}
 					{{/* Simple one-hop relationship */}}
-					sm.From({{$fAlias.UpPlural}}.Name()),
+					sm.From({{$.TableVar $rel.Foreign}}.Name()),
 					{{- range $index, $fromCol := $firstSide.FromColumns -}}
 					{{- $toCol := index $firstSide.ToColumns $index}}
-					sm.Where({{$.Dialect}}.Quote({{$fAlias.UpPlural}}.Alias(), {{quote $toCol}}).EQ({{$.Dialect}}.Quote(parent, {{quote $fromCol}}))),
+					sm.Where({{$.Dialect}}.Quote({{$.TableVar $rel.Foreign}}.Alias(), {{quote $toCol}}).EQ({{$.Dialect}}.Quote(parent, {{quote $fromCol}}))),
 					{{- end}}
 					{{- else}}
 					{{/* Multi-hop relationship - need to join through intermediate tables */}}
 					{{- $firstSideToAlias := $.Aliases.Table $firstSide.To}}
-					sm.From({{$firstSideToAlias.UpPlural}}.Name()),
+					sm.From({{$.TableVar $firstSide.To}}.Name()),
 					{{- range $index, $fromCol := $firstSide.FromColumns -}}
 					{{- $toCol := index $firstSide.ToColumns $index}}
-					sm.Where({{$.Dialect}}.Quote({{$firstSideToAlias.UpPlural}}.Alias(), {{quote $toCol}}).EQ({{$.Dialect}}.Quote(parent, {{quote $fromCol}}))),
+					sm.Where({{$.Dialect}}.Quote({{$.TableVar $firstSide.To}}.Alias(), {{quote $toCol}}).EQ({{$.Dialect}}.Quote(parent, {{quote $fromCol}}))),
 					{{- end}}
 					{{- range $sideIndex, $side := $rel.Sides -}}
 					{{- if eq $sideIndex 0 -}}{{continue}}{{- end}}
 					{{- $sideFromAlias := $.Aliases.Table $side.From -}}
 					{{- $sideToAlias := $.Aliases.Table $side.To}}
-					sm.InnerJoin({{$sideToAlias.UpPlural}}.Name()).On(
+					sm.InnerJoin({{$.TableVar $side.To}}.Name()).On(
 						{{- range $index, $fromCol := $side.FromColumns -}}
 						{{- $toCol := index $side.ToColumns $index}}
-						{{$.Dialect}}.Quote({{$sideToAlias.UpPlural}}.Alias(), {{quote $toCol}}).EQ({{$.Dialect}}.Quote({{$sideFromAlias.UpPlural}}.Alias(), {{quote $fromCol}})),
+						{{$.Dialect}}.Quote({{$.TableVar $side.To}}.Alias(), {{quote $toCol}}).EQ({{$.Dialect}}.Quote({{$.TableVar $side.From}}.Alias(), {{quote $fromCol}})),
 						{{- end}}
 					),
 					{{- end}}
@@ -103,7 +103,7 @@ func build{{$tAlias.UpSingular}}CountPreloader() {{$tAlias.DownSingular}}CountPr
 	}
 }
 
-type {{$tAlias.DownSingular}}CountThenLoader[Q orm.Loadable] struct {
+type {{$tAlias.UpSingular}}CountThenLoader[Q orm.Loadable] struct {
 	{{range $rel := $rels -}}
 	{{- if not $rel.IsToMany}}{{continue}}{{end -}}
 	{{- $relAlias := $tAlias.Relationship $rel.Name -}}
@@ -111,7 +111,7 @@ type {{$tAlias.DownSingular}}CountThenLoader[Q orm.Loadable] struct {
 	{{end -}}
 }
 
-func build{{$tAlias.UpSingular}}CountThenLoader[Q orm.Loadable]() {{$tAlias.DownSingular}}CountThenLoader[Q] {
+func Build{{$tAlias.UpSingular}}CountThenLoader[Q orm.Loadable]() {{$tAlias.UpSingular}}CountThenLoader[Q] {
 	{{range $rel := $rels -}}
 	{{- if not $rel.IsToMany}}{{continue}}{{end -}}
 	{{$relAlias := $tAlias.Relationship $rel.Name -}}
@@ -120,7 +120,7 @@ func build{{$tAlias.UpSingular}}CountThenLoader[Q orm.Loadable]() {{$tAlias.Down
 	}
 	{{end}}
 
-	return {{$tAlias.DownSingular}}CountThenLoader[Q]{
+	return {{$tAlias.UpSingular}}CountThenLoader[Q]{
 		{{range $rel := $rels -}}
 		{{- if not $rel.IsToMany}}{{continue}}{{end -}}
 		{{$relAlias := $tAlias.Relationship $rel.Name -}}
@@ -229,42 +229,42 @@ func (os {{$tAlias.UpSingular}}Slice) LoadCount{{$relAlias}}(ctx context.Context
 			{{range $index, $local := $firstSide.FromColumns -}}
 			{{$toLocal := index $firstSide.ToColumns $index -}}
 			{{$firstToColAlias := index $firstTo.Columns $toLocal -}}
-			{{$firstTo.UpPlural}}.Columns.{{$firstToColAlias}}.As({{quote $local}}),
+			{{$.TableVar $firstSide.To}}.Columns.{{$firstToColAlias}}.As({{quote $local}}),
 			{{end -}}
 			{{$.Dialect}}.Raw("count(*) as count"),
 		),
 		{{if eq (len $rel.Sides) 1 -}}
 		// Single-hop: FROM related table directly
-		sm.From({{$fAlias.UpPlural}}.NameAs()),
+		sm.From({{$.TableVar $rel.Foreign}}.NameAs()),
 		{{range $where := $firstSide.ToWhere -}}
 		{{$whereColAlias := index $firstTo.Columns $where.Column -}}
-		sm.Where({{$firstTo.UpPlural}}.Columns.{{$whereColAlias}}.EQ({{$.Dialect}}.Arg({{quote $where.SQLValue}}))),
+		sm.Where({{$.TableVar $firstSide.To}}.Columns.{{$whereColAlias}}.EQ({{$.Dialect}}.Arg({{quote $where.SQLValue}}))),
 		{{end -}}
 		{{- else -}}
 		// Multi-hop: FROM first join table, JOIN through to final related table
-		sm.From({{$firstTo.UpPlural}}.NameAs()),
+		sm.From({{$.TableVar $firstSide.To}}.NameAs()),
 		{{range $where := $firstSide.ToWhere -}}
 		{{$whereColAlias := index $firstTo.Columns $where.Column -}}
-		sm.Where({{$firstTo.UpPlural}}.Columns.{{$whereColAlias}}.EQ({{$.Dialect}}.Arg({{quote $where.SQLValue}}))),
+		sm.Where({{$.TableVar $firstSide.To}}.Columns.{{$whereColAlias}}.EQ({{$.Dialect}}.Arg({{quote $where.SQLValue}}))),
 		{{end -}}
 		{{range $sideIndex, $side := $rel.Sides -}}
 		{{if eq $sideIndex 0 -}}{{continue}}{{end -}}
 		{{$sideFrom := $.Aliases.Table $side.From -}}
 		{{$sideTo := $.Aliases.Table $side.To -}}
-		sm.InnerJoin({{$sideTo.UpPlural}}.NameAs()).On(
+		sm.InnerJoin({{$.TableVar $side.To}}.NameAs()).On(
 			{{range $i, $fromColKey := $side.FromColumns -}}
 			{{$toColKey := index $side.ToColumns $i -}}
 			{{$sideToColAlias := index $sideTo.Columns $toColKey -}}
 			{{$sideFromColAlias := index $sideFrom.Columns $fromColKey -}}
-			{{$sideTo.UpPlural}}.Columns.{{$sideToColAlias}}.EQ({{$sideFrom.UpPlural}}.Columns.{{$sideFromColAlias}}),
+			{{$.TableVar $side.To}}.Columns.{{$sideToColAlias}}.EQ({{$.TableVar $side.From}}.Columns.{{$sideFromColAlias}}),
 			{{end -}}
 			{{range $where := $side.FromWhere -}}
 			{{$fromWhereColAlias := index $sideFrom.Columns $where.Column -}}
-			{{$sideFrom.UpPlural}}.Columns.{{$fromWhereColAlias}}.EQ({{$.Dialect}}.Arg({{quote $where.SQLValue}})),
+			{{$.TableVar $side.From}}.Columns.{{$fromWhereColAlias}}.EQ({{$.Dialect}}.Arg({{quote $where.SQLValue}})),
 			{{end -}}
 			{{range $where := $side.ToWhere -}}
 			{{$toWhereColAlias := index $sideTo.Columns $where.Column -}}
-			{{$sideTo.UpPlural}}.Columns.{{$toWhereColAlias}}.EQ({{$.Dialect}}.Arg({{quote $where.SQLValue}})),
+			{{$.TableVar $side.To}}.Columns.{{$toWhereColAlias}}.EQ({{$.Dialect}}.Arg({{quote $where.SQLValue}})),
 			{{end -}}
 		),
 		{{end -}}
@@ -274,13 +274,13 @@ func (os {{$tAlias.UpSingular}}Slice) LoadCount{{$relAlias}}(ctx context.Context
 		{{$local := index $firstSide.FromColumns 0 -}}
 		{{$toLocal := index $firstSide.ToColumns 0 -}}
 		{{$firstToColAlias := index $firstTo.Columns $toLocal -}}
-		sm.Where({{$firstTo.UpPlural}}.Columns.{{$firstToColAlias}}.OP("IN", PKArgExpr)),
+		sm.Where({{$.TableVar $firstSide.To}}.Columns.{{$firstToColAlias}}.OP("IN", PKArgExpr)),
 		{{- else -}}
 		sm.Where({{$.Dialect}}.Group(
 			{{range $index, $local := $firstSide.FromColumns -}}
 			{{$toLocal := index $firstSide.ToColumns $index -}}
 			{{$firstToColAlias := index $firstTo.Columns $toLocal -}}
-			{{$firstTo.UpPlural}}.Columns.{{$firstToColAlias}},
+			{{$.TableVar $firstSide.To}}.Columns.{{$firstToColAlias}},
 			{{end -}}
 		).OP("IN", PKArgExpr)),
 		{{- end}}
@@ -288,7 +288,7 @@ func (os {{$tAlias.UpSingular}}Slice) LoadCount{{$relAlias}}(ctx context.Context
 		{{range $index, $local := $firstSide.FromColumns -}}
 		{{$toLocal := index $firstSide.ToColumns $index -}}
 		{{$firstToColAlias := index $firstTo.Columns $toLocal -}}
-		sm.GroupBy({{$firstTo.UpPlural}}.Columns.{{$firstToColAlias}}),
+		sm.GroupBy({{$.TableVar $firstSide.To}}.Columns.{{$firstToColAlias}}),
 		{{end -}}
 	}
 	batchMods = append(batchMods, mods...)
