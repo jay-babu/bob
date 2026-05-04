@@ -1,10 +1,13 @@
+{{- $isSplit := and $.ModelSplit $.ModelSplit.Enabled -}}
+{{- $isFacade := and $isSplit (eq $.ModelSplit.Generation "facade") -}}
+{{- if not $isFacade -}}
 {{$.Importer.Import "github.com/jaswdr/faker/v2"}}
 
 
 var defaultFaker = faker.New()
 
 {{$doneTypes := dict }}
-{{- range $table := .Tables}}
+{{- range $table := .AllTables}}
 {{- $tAlias := $.Aliases.Table $table.Key}}
   {{range $column := $table.Columns -}}
     {{- if hasKey $doneTypes $column.Type}}{{continue}}{{end -}}
@@ -34,3 +37,4 @@ var defaultFaker = faker.New()
       {{replace "BASETYPE" $typ $typDef.RandomExpr}}
     }
 {{end -}}
+{{end}}

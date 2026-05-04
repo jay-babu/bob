@@ -189,6 +189,13 @@ func generate[T, C, I any](s *State[C], data *TemplateData[T, C, I]) error {
 			continue
 		}
 
+		if o.Key == "factory" && data.ModelSplit != nil && data.ModelSplit.Enabled {
+			if err := generateSplitFactoryOutput(o, data, s.Config.Generator, s.Config.NoTests); err != nil {
+				return fmt.Errorf("unable to generate split factory output: %w", err)
+			}
+			continue
+		}
+
 		// Has a stable output folder
 		if o.OutFolder != "" {
 			if err := generateSingletonOutput(o, data, s.Config.Generator, s.Config.NoTests); err != nil {
