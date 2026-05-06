@@ -23,7 +23,7 @@ type preloadCounts struct {
 	{{- end -}}
 	{{- if $hasToMany -}}
 	{{$tAlias := $.Aliases.Table $table.Key -}}
-	{{$tAlias.UpSingular}} {{$tAlias.DownSingular}}CountPreloader
+	{{$tAlias.UpSingular}} {{$.CountPreloaderType $table.Key}}
 	{{end}}{{end}}
 }
 
@@ -37,7 +37,7 @@ func getPreloadCount() preloadCounts {
 		{{- end -}}
 		{{- if $hasToMany -}}
 		{{$tAlias := $.Aliases.Table $table.Key -}}
-		{{$tAlias.UpSingular}}: build{{$tAlias.UpSingular}}CountPreloader(),
+		{{$tAlias.UpSingular}}: {{$.BuildCountPreloaderFunc $table.Key}}(),
 		{{end}}{{end}}
 	}
 }
@@ -51,7 +51,7 @@ type thenLoadCounts[Q orm.Loadable] struct {
 	{{- end -}}
 	{{- if $hasToMany -}}
 	{{$tAlias := $.Aliases.Table $table.Key -}}
-	{{$tAlias.UpSingular}} {{$tAlias.DownSingular}}CountThenLoader[Q]
+	{{$tAlias.UpSingular}} {{$.CountThenLoaderType $table.Key}}[Q]
 	{{end}}{{end}}
 }
 
@@ -65,7 +65,7 @@ func getThenLoadCount[Q orm.Loadable]() thenLoadCounts[Q] {
 		{{- end -}}
 		{{- if $hasToMany -}}
 		{{$tAlias := $.Aliases.Table $table.Key -}}
-		{{$tAlias.UpSingular}}: build{{$tAlias.UpSingular}}CountThenLoader[Q](),
+		{{$tAlias.UpSingular}}: {{$.BuildCountThenLoaderFunc $table.Key}}[Q](),
 		{{end}}{{end}}
 	}
 }

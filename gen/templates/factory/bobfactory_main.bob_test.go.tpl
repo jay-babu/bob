@@ -1,12 +1,5 @@
-{{- $needsModels := false -}}
-{{- range $table := .Tables -}}
-  {{- range $rel := $.Relationships.Get $table.Key -}}
-    {{- $bridgeRels := $.Tables.NeededBridgeRels $rel -}}
-    {{- if and $rel.IsToMany (ne $rel.Foreign $table.Key) (not $bridgeRels) (eq (len $rel.Sides) 1) -}}
-      {{- $needsModels = true -}}
-    {{- end -}}
-  {{- end -}}
-{{- end -}}
+{{- $isSplit := and $.ModelSplit $.ModelSplit.Enabled -}}
+{{- if not $isSplit -}}
 {{- $.Importer.Import "context" -}}
 {{- $.Importer.Import "errors" -}}
 {{- $.Importer.Import "testing" -}}
@@ -126,4 +119,5 @@ func TestRequireAll{{$tAlias.UpSingular}}(t *testing.T) {
 }
 {{end}}
 
+{{end}}
 {{end}}
