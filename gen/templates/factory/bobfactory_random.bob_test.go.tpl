@@ -1,3 +1,6 @@
+{{- $isSplit := and $.ModelSplit $.ModelSplit.Enabled -}}
+{{- $isFacade := and $isSplit (eq $.ModelSplit.Generation "facade") -}}
+{{- if not $isFacade -}}
 {{$.Importer.Import "testing"}}
 {{$.Importer.Import "github.com/stephenafamo/bob"}}
 
@@ -49,3 +52,4 @@ var testDB bob.Transactor[bob.Tx]
       }
 
 {{end -}}
+{{end}}

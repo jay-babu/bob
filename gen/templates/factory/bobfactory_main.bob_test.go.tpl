@@ -1,3 +1,5 @@
+{{- $isSplit := and $.ModelSplit $.ModelSplit.Enabled -}}
+{{- if not $isSplit -}}
 {{- $.Importer.Import "context" -}}
 {{- $.Importer.Import "errors" -}}
 {{- $.Importer.Import "testing" -}}
@@ -72,4 +74,5 @@ func TestRequireAll{{$tAlias.UpSingular}}(t *testing.T) {
 }
 {{end}}
 
+{{end}}
 {{end}}

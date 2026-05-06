@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"path"
+	"slices"
 	"strings"
 	"text/template"
 	"unicode"
@@ -13,6 +14,7 @@ import (
 	"github.com/stephenafamo/bob/gen/drivers"
 	"github.com/stephenafamo/bob/gen/language"
 	"github.com/stephenafamo/bob/internal"
+	"github.com/stephenafamo/bob/orm"
 	"github.com/volatiletech/strmangle"
 )
 
@@ -225,6 +227,132 @@ func (d *TemplateData[T, C, I]) ThenLoaderType(tableKey string) string {
 func (d *TemplateData[T, C, I]) BuildThenLoaderFunc(tableKey string) string {
 	alias := d.TableAlias(tableKey)
 	return d.splitRef(tableKey, "Build"+alias.UpSingular+"ThenLoader")
+}
+
+func (d *TemplateData[T, C, I]) CountPreloaderType(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, alias.UpSingular+"CountPreloader")
+}
+
+func (d *TemplateData[T, C, I]) BuildCountPreloaderFunc(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, "Build"+alias.UpSingular+"CountPreloader")
+}
+
+func (d *TemplateData[T, C, I]) CountThenLoaderType(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, alias.UpSingular+"CountThenLoader")
+}
+
+func (d *TemplateData[T, C, I]) BuildCountThenLoaderFunc(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, "Build"+alias.UpSingular+"CountThenLoader")
+}
+
+func (d *TemplateData[T, C, I]) FactoryTemplateType(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, alias.UpSingular+"Template")
+}
+
+func (d *TemplateData[T, C, I]) FactoryModType(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, alias.UpSingular+"Mod")
+}
+
+func (d *TemplateData[T, C, I]) FactoryModFuncType(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, alias.UpSingular+"ModFunc")
+}
+
+func (d *TemplateData[T, C, I]) FactoryModSliceType(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, alias.UpSingular+"ModSlice")
+}
+
+func (d *TemplateData[T, C, I]) FactoryModsVar(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, alias.UpSingular+"Mods")
+}
+
+func (d *TemplateData[T, C, I]) FactoryNewWithContextFunc(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, "New"+alias.UpSingular+"WithContext")
+}
+
+func (d *TemplateData[T, C, I]) FactoryFromExistingFunc(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, "FromExisting"+alias.UpSingular)
+}
+
+func (d *TemplateData[T, C, I]) FactoryRelDependencies(r orm.Relationship) string {
+	needed := d.AllTables.NeededBridgeRels(r)
+	ma := make([]string, len(needed))
+
+	for i, need := range needed {
+		alias := d.TableAlias(need.Table)
+		ma[i] = fmt.Sprintf("%s *%s,", alias.DownSingular, d.FactoryTemplateType(need.Table))
+	}
+
+	return strings.Join(ma, "")
+}
+
+func (d *TemplateData[T, C, I]) FactoryRelDependenciesTyp(r orm.Relationship) string {
+	needed := d.AllTables.NeededBridgeRels(r)
+	ma := make([]string, len(needed))
+
+	for i, need := range needed {
+		alias := d.TableAlias(need.Table)
+		ma[i] = fmt.Sprintf("%s *%s", alias.DownSingular, d.FactoryTemplateType(need.Table))
+	}
+
+	return strings.Join(ma, "\n")
+}
+
+func (d *TemplateData[T, C, I]) FactoryDependencyMethods(tableKey string) string {
+	deps := make(map[string]struct{})
+	for _, rel := range d.Relationships.Get(tableKey) {
+		deps[rel.Foreign()] = struct{}{}
+		for _, need := range d.AllTables.NeededBridgeRels(rel) {
+			deps[need.Table] = struct{}{}
+		}
+	}
+
+	tableKeys := make([]string, 0, len(deps))
+	for tableKey := range deps {
+		tableKeys = append(tableKeys, tableKey)
+	}
+	slices.Sort(tableKeys)
+
+	methods := make([]string, 0, len(tableKeys)*2)
+	for _, dep := range tableKeys {
+		alias := d.TableAlias(dep)
+		methods = append(methods,
+			fmt.Sprintf("New%sWithContext(context.Context, ...%s) *%s", alias.UpSingular, d.FactoryModType(dep), d.FactoryTemplateType(dep)),
+			fmt.Sprintf("FromExisting%s(*models.%s) *%s", alias.UpSingular, alias.UpSingular, d.FactoryTemplateType(dep)),
+		)
+	}
+
+	return strings.Join(methods, "\n")
+}
+
+func (d *TemplateData[T, C, I]) RelDependenciesPos(r orm.Relationship) string {
+	needed := d.AllTables.NeededBridgeRels(r)
+	ma := make([]string, len(needed))
+
+	for i, need := range needed {
+		alias := d.TableAlias(need.Table)
+		if need.Many {
+			ma[i] = fmt.Sprintf(
+				"%s%d %s,", alias.DownPlural, need.Position, d.SliceType(need.Table),
+			)
+		} else {
+			ma[i] = fmt.Sprintf(
+				"%s%d *%s,", alias.DownSingular, need.Position, d.ModelType(need.Table),
+			)
+		}
+	}
+
+	return strings.Join(ma, "")
 }
 
 func loadTemplate(tpl *template.Template, customFuncs template.FuncMap, name, content string) error {

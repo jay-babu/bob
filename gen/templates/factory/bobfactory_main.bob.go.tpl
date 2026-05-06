@@ -1,7 +1,13 @@
-{{$.Importer.Import "context"}}
+{{- $isSplit := and $.ModelSplit $.ModelSplit.Enabled -}}
+{{- $isFacade := and $isSplit (eq $.ModelSplit.Generation "facade") -}}
+{{- $isComponent := and $isSplit (eq $.ModelSplit.Generation "component") -}}
+{{- if not $isFacade -}}
+{{if not $isComponent}}{{$.Importer.Import "context"}}{{end}}
 {{$.Importer.Import "fmt"}}
 {{$.Importer.Import "strings"}}
+{{if not $isComponent}}
 {{$.Importer.Import "models" (index $.OutputPackages "models") }}
+{{end}}
 
 // MissingRequiredFieldsError is returned by Create() when RequireAll() is active
 // and required fields are not explicitly set.
@@ -18,6 +24,7 @@ func (e *MissingRequiredFieldsError) Error() string {
 	)
 }
 
+{{if not $isComponent}}
 type Factory struct {
     {{range $table := .Tables}}
     {{ $tAlias := $.Aliases.Table $table.Key -}}
@@ -88,4 +95,5 @@ f.base{{$tAlias.UpSingular}}Mods = append(f.base{{$tAlias.UpSingular}}Mods, mods
 }
 
 {{end}}
-
+{{end}}
+{{end}}

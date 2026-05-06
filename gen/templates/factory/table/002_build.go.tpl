@@ -24,12 +24,12 @@ func (t {{$tAlias.UpSingular}}Template) setModelRels(o *models.{{$tAlias.UpSingu
                         rel.R.{{$invAlias}} = append(rel.R.{{$invAlias}}, o)
                     {{- end}}
                 {{- end}}
-                {{$.Tables.SetFactoryDeps $.CurrentPackage $.Importer $.Types $.Aliases . false}}
+                {{$.AllTables.SetFactoryDeps $.CurrentPackage $.Importer $.Types $.Aliases . false}}
             {{- else -}}
                 rel := models.{{$ftable.UpSingular}}Slice{}
                 for _, r := range t.r.{{$relAlias}} {
                   related := r.o.BuildMany(r.number)
-                  {{- $setter := $.Tables.SetFactoryDeps $.CurrentPackage $.Importer $.Types $.Aliases . false}}
+                  {{- $setter := $.AllTables.SetFactoryDeps $.CurrentPackage $.Importer $.Types $.Aliases . false}}
                   {{- if or $setter (and (not $.NoBackReferencing) $invRel.Name) }}
                   for _, rel := range related {
                     {{$setter}}

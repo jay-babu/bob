@@ -6,7 +6,7 @@
 {{$.Importer.Import "fmt"}}
 {{end}}
 
-{{range $rel := $.Relationships.Get $table.Key -}}{{if not ($.Tables.RelIsView $rel) -}}
+{{range $rel := $.Relationships.Get $table.Key -}}{{if not ($.AllTables.RelIsView $rel) -}}
 {{- $ftable := $.Aliases.Table $rel.Foreign -}}
 {{- $relAlias := $tAlias.Relationship $rel.Name -}}
 {{- $invRel := $.Relationships.GetInverse . -}}
@@ -19,26 +19,26 @@
 
 
 {{range $index, $side := reverse $valuedSides -}}
-  {{$sideTable := $.Tables.Get $side.TableName}}
+  {{$sideTable := $.AllTables.Get $side.TableName}}
   {{$sideAlias := $.Aliases.Table $side.TableName}}
 
 
   {{if eq $rel.ForeignPosition $side.Position}}
   func insert{{$tAlias.UpSingular}}{{$relAlias}}{{$index}}(ctx context.Context, exec bob.Executor
   {{- if $rel.IsToMany -}}
-    , {{$sideAlias.DownPlural}}{{$side.Position}} []*{{$sideAlias.UpSingular}}Setter
+    , {{$sideAlias.DownPlural}}{{$side.Position}} []*{{$.SetterType $side.TableName}}
   {{- else -}}
-    , {{$to}} *{{$sideAlias.UpSingular}}Setter
+    , {{$to}} *{{$.SetterType $side.TableName}}
   {{- end -}}
   {{- range $map := $side.UniqueExternals -}}
     {{- $a := $.Aliases.Table .ExternalTable -}}
     {{- if $rel.NeedsMany .ExtPosition -}}
-      , {{$a.DownPlural}}{{$map.ExtPosition}} {{$a.UpSingular}}Slice
+      , {{$a.DownPlural}}{{$map.ExtPosition}} {{$.SliceType .ExternalTable}}
     {{- else -}}
-      , {{$a.DownSingular}}{{$map.ExtPosition}} *{{$a.UpSingular}}
+      , {{$a.DownSingular}}{{$map.ExtPosition}} *{{$.ModelType .ExternalTable}}
     {{- end -}}
   {{- end -}}
-  ) ({{if $rel.IsToMany}}{{$sideAlias.UpSingular}}Slice{{else}}*{{$sideAlias.UpSingular}}{{end}}, error) {
+  ) ({{if $rel.IsToMany}}{{$.SliceType $side.TableName}}{{else}}*{{$.ModelType $side.TableName}}{{end}}, error) {
     {{$tblName := $to -}}
     {{if $rel.IsToMany -}}
       {{$tblName = printf "%s%d[i]" $ftable.DownPlural $rel.ForeignPosition -}}
@@ -52,21 +52,21 @@
           {{$tblName}}.{{$colName}} = {{$.Types.ToOptional $.CurrentPackage $.Importer $sideC.Type $val $sideC.Nullable false}}
         {{else}}
           {{$a := $.Aliases.Table .ExternalTable -}}
-          {{$t := $.Tables.Get .ExternalTable -}}
+          {{$t := $.AllTables.Get .ExternalTable -}}
           {{$c := $t.GetColumn .ExternalColumn -}}
           {{$colVal := printf "%s%d" $a.DownSingular $map.ExtPosition -}}
           {{if $rel.NeedsMany .ExtPosition -}}
             {{$colVal = printf "%s%d[i]" $a.DownPlural $map.ExtPosition -}}
           {{end -}}
-          {{$tblName}}.{{$colName}} = {{$.Tables.ColumnAssigner $.CurrentPackage $.Importer $.Types $.Aliases $rel.Foreign .ExternalTable $map.Column .ExternalColumn $colVal true}}
+          {{$tblName}}.{{$colName}} = {{$.AllTables.ColumnAssigner $.CurrentPackage $.Importer $.Types $.Aliases $rel.Foreign .ExternalTable $map.Column .ExternalColumn $colVal true}}
         {{- end}}
       {{- end}}
     {{- if $rel.IsToMany}}}{{end}}
 
     {{if $rel.IsToMany -}}
-      ret, err := {{$sideAlias.UpPlural}}.Insert(bob.ToMods({{$ftable.DownPlural}}{{$rel.ForeignPosition}}...)).All(ctx, exec)
+      ret, err := {{$.TableVar $side.TableName}}.Insert(bob.ToMods({{$ftable.DownPlural}}{{$rel.ForeignPosition}}...)).All(ctx, exec)
     {{- else -}}
-      ret, err := {{$sideAlias.UpPlural}}.Insert({{$to}}).One(ctx, exec)
+      ret, err := {{$.TableVar $side.TableName}}.Insert({{$to}}).One(ctx, exec)
     {{- end}}
     if err != nil {
         return ret, fmt.Errorf("insert{{$tAlias.UpSingular}}{{$relAlias}}{{$index}}: %w", err)
@@ -80,30 +80,30 @@
   func attach{{$tAlias.UpSingular}}{{$relAlias}}{{$index}}(ctx context.Context, exec bob.Executor, count int
   {{- if not ($sideTable.IsJoinTableForRel $rel $side.Position) -}}
     {{- if $rel.NeedsMany $side.Position  -}}
-      , {{$sideAlias.DownPlural}}{{$side.Position}} {{$sideAlias.UpSingular}}Slice
+      , {{$sideAlias.DownPlural}}{{$side.Position}} {{$.SliceType $side.TableName}}
     {{- else -}}
-      , {{$sideAlias.DownSingular}}{{$side.Position}} *{{$sideAlias.UpSingular}}
+      , {{$sideAlias.DownSingular}}{{$side.Position}} *{{$.ModelType $side.TableName}}
     {{- end -}}
   {{- end -}}
   {{- range $map := $side.UniqueExternals -}}
     {{- $a := $.Aliases.Table .ExternalTable -}}
     {{- if $rel.NeedsMany .ExtPosition -}}
-      , {{$a.DownPlural}}{{$map.ExtPosition}} {{$a.UpSingular}}Slice
+      , {{$a.DownPlural}}{{$map.ExtPosition}} {{$.SliceType .ExternalTable}}
     {{- else -}}
-      , {{$a.DownSingular}}{{$map.ExtPosition}} *{{$a.UpSingular}}
+      , {{$a.DownSingular}}{{$map.ExtPosition}} *{{$.ModelType .ExternalTable}}
     {{- end -}}
   {{- end -}}
-  ) ({{if $rel.NeedsMany $side.Position}}{{$sideAlias.UpSingular}}Slice{{else}}*{{$sideAlias.UpSingular}}{{end}}, error) {
+  ) ({{if $rel.NeedsMany $side.Position}}{{$.SliceType $side.TableName}}{{else}}*{{$.ModelType $side.TableName}}{{end}}, error) {
     {{- $uniqueEnd := and $side.End (not (index $rel.Sides (sub $side.Position 1)).ToUnique) -}}
-    {{- $needsIndividualUpdate := (and (not $uniqueEnd) ($rel.NeedsMany $side.Position)  (not ($sideTable.IsJoinTableForRel $rel $side.Position))) -}}
+    {{- $needsIndividualUpdate := (and ($rel.NeedsMany $side.Position) (not ($sideTable.IsJoinTableForRel $rel $side.Position)) (or (not $uniqueEnd) (not $.SliceMutationMethods))) -}}
     {{if $needsIndividualUpdate}}
     for i := range {{$sideAlias.DownPlural}}{{$side.Position}} {
-      setter := &{{$sideAlias.UpSingular}}Setter{
+      setter := &{{$.SetterType $side.TableName}}{
         {{range $map := $side.Mapped -}}
           {{$colName := $sideAlias.Column $map.Column -}}
           {{$sideColumn := $sideTable.GetColumn .Column -}}
           {{$tableAlias := $.Aliases.Table .ExternalTable -}}
-          {{$table := $.Tables.Get .ExternalTable -}}
+          {{$table := $.AllTables.Get .ExternalTable -}}
           {{$column := $table.GetColumn .ExternalColumn -}}
           {{if .HasValue -}}
             {{$val := index .Value 1 -}}
@@ -113,7 +113,7 @@
             {{if $rel.NeedsMany .ExtPosition -}}
               {{$colVal = printf "%s%d[i]" $tableAlias.DownPlural $map.ExtPosition -}}
             {{end -}}
-            {{$colName}}: {{$.Tables.ColumnAssigner $.CurrentPackage $.Importer $.Types $.Aliases $side.TableName $table.Key $map.Column .ExternalColumn $colVal true}},
+            {{$colName}}: {{$.AllTables.ColumnAssigner $.CurrentPackage $.Importer $.Types $.Aliases $side.TableName $table.Key $map.Column .ExternalColumn $colVal true}},
           {{- end}}
         {{- end}}
       }
@@ -134,11 +134,11 @@
 
     {{if $needsBulkUpdate -}}
     {{if and ($rel.NeedsMany $side.Position) ($sideTable.IsJoinTableForRel $rel $side.Position) -}}
-      setters := make([]*{{$sideAlias.UpSingular}}Setter, count)
+      setters := make([]*{{$.SetterType $side.TableName}}, count)
       for i := range count {
-        setters[i] = &{{$sideAlias.UpSingular}}Setter{
+        setters[i] = &{{$.SetterType $side.TableName}}{
     {{- else -}}
-        setter := &{{$sideAlias.UpSingular}}Setter{
+        setter := &{{$.SetterType $side.TableName}}{
     {{- end -}}
       {{range $map := $side.Mapped -}}
         {{if not (and $needsIndividualUpdate ($rel.NeedsMany .ExtPosition)) -}}
@@ -149,13 +149,13 @@
             {{$colName}}: {{$.Types.ToOptional $.CurrentPackage $.Importer $sideC.Type $val $sideC.Nullable false}},
           {{else}}
             {{$a := $.Aliases.Table .ExternalTable -}}
-            {{$t := $.Tables.Get .ExternalTable -}}
+            {{$t := $.AllTables.Get .ExternalTable -}}
             {{$c := $t.GetColumn .ExternalColumn -}}
             {{$colVal := printf "%s%d" $a.DownSingular $map.ExtPosition -}}
             {{if $rel.NeedsMany .ExtPosition -}}
               {{$colVal = printf "%s%d[i]" $a.DownPlural $map.ExtPosition -}}
             {{end -}}
-            {{$colName}}: {{$.Tables.ColumnAssigner $.CurrentPackage $.Importer $.Types $.Aliases $side.TableName .ExternalTable $map.Column .ExternalColumn $colVal true}},
+            {{$colName}}: {{$.AllTables.ColumnAssigner $.CurrentPackage $.Importer $.Types $.Aliases $side.TableName .ExternalTable $map.Column .ExternalColumn $colVal true}},
           {{- end}}
         {{- end}}
       {{- end}}
@@ -164,9 +164,9 @@
 
     {{if ($sideTable.IsJoinTableForRel $rel $side.Position) -}}
       {{if $rel.NeedsMany $side.Position -}}
-        {{$sideAlias.DownPlural}}{{$side.Position}}, err := {{$sideAlias.UpPlural}}.Insert(bob.ToMods(setters...)).All(ctx, exec)
+        {{$sideAlias.DownPlural}}{{$side.Position}}, err := {{$.TableVar $side.TableName}}.Insert(bob.ToMods(setters...)).All(ctx, exec)
       {{- else -}}
-        {{$sideAlias.DownSingular}}{{$side.Position}}, err := {{$sideAlias.UpPlural}}.Insert(setter).One(ctx, exec)
+        {{$sideAlias.DownSingular}}{{$side.Position}}, err := {{$.TableVar $side.TableName}}.Insert(setter).One(ctx, exec)
       {{- end}}
     {{- else -}}
       {{if $rel.NeedsMany $side.Position -}}
@@ -189,18 +189,18 @@
 {{end}}
 
 {{if not $rel.IsToMany -}}
-  func ({{$from}} *{{$tAlias.UpSingular}}) Insert{{$relAlias}}(ctx context.Context, exec bob.Executor,{{$.Tables.RelDependenciesPos $.Aliases $rel}} related *{{$ftable.UpSingular}}Setter) error {
+  func ({{$from}} *{{$tAlias.UpSingular}}) Insert{{$relAlias}}(ctx context.Context, exec bob.Executor,{{$.RelDependenciesPos $rel}} related *{{$.SetterType $rel.Foreign}}) error {
     var err error
 
     {{if $rel.InsertEarly -}}
-      {{$to}}, err := {{$ftable.UpPlural}}.Insert(related).One(ctx, exec)
+      {{$to}}, err := {{$.TableVar $rel.Foreign}}.Insert(related).One(ctx, exec)
       if err != nil {
           return fmt.Errorf("inserting related objects: %w", err)
       }
     {{end}}
 
     {{range $index, $side := (reverse $valuedSides) -}}
-      {{$sideTable := $.Tables.Get $side.TableName}}
+      {{$sideTable := $.AllTables.Get $side.TableName}}
       {{$sideAlias := $.Aliases.Table $side.TableName}}
 
       {{if eq $side.Position $rel.ForeignPosition -}}
@@ -247,11 +247,11 @@
     return nil
   }
 
-  func ({{$from}} *{{$tAlias.UpSingular}}) Attach{{$relAlias}}(ctx context.Context, exec bob.Executor,{{$.Tables.RelDependenciesPos $.Aliases $rel}} {{$to}} *{{$ftable.UpSingular}}) error {
+  func ({{$from}} *{{$tAlias.UpSingular}}) Attach{{$relAlias}}(ctx context.Context, exec bob.Executor,{{$.RelDependenciesPos $rel}} {{$to}} *{{$.ModelType $rel.Foreign}}) error {
     var err error
 
     {{range $index, $side := (reverse $valuedSides) -}}
-      {{$sideTable := $.Tables.Get $side.TableName}}
+      {{$sideTable := $.AllTables.Get $side.TableName}}
       {{$sideAlias := $.Aliases.Table $side.TableName}}
       {{$show := lt $index (len $valuedSides | add -1)}}
       {{if $show -}}
@@ -294,7 +294,7 @@
   }
 
 {{else -}}
-  func ({{$from}} *{{$tAlias.UpSingular}}) Insert{{$relAlias}}(ctx context.Context, exec bob.Executor,{{$.Tables.RelDependenciesPos $.Aliases $rel}} related ...*{{$ftable.UpSingular}}Setter) error {
+  func ({{$from}} *{{$tAlias.UpSingular}}) Insert{{$relAlias}}(ctx context.Context, exec bob.Executor,{{$.RelDependenciesPos $rel}} related ...*{{$.SetterType $rel.Foreign}}) error {
     if len(related) == 0 {
       return nil
     }
@@ -302,15 +302,15 @@
     var err error
 
     {{if $rel.InsertEarly -}}
-      inserted, err := {{$ftable.UpPlural}}.Insert(bob.ToMods(related...)).All(ctx, exec)
+      inserted, err := {{$.TableVar $rel.Foreign}}.Insert(bob.ToMods(related...)).All(ctx, exec)
       if err != nil {
           return fmt.Errorf("inserting related objects: %w", err)
       }
-      {{$to}} := {{$ftable.UpSingular}}Slice(inserted)
+      {{$to}} := {{$.SliceType $rel.Foreign}}(inserted)
     {{end}}
 
     {{range $index, $side := (reverse $valuedSides) -}}
-      {{$sideTable := $.Tables.Get $side.TableName}}
+      {{$sideTable := $.AllTables.Get $side.TableName}}
       {{$sideAlias := $.Aliases.Table $side.TableName}}
       {{if eq $side.Position $rel.ForeignPosition -}}
         {{$to}}, err := insert{{$tAlias.UpSingular}}{{$relAlias}}{{$index}}(ctx, exec, related
@@ -358,16 +358,16 @@
   }
 
 
-  func ({{$from}} *{{$tAlias.UpSingular}}) Attach{{$relAlias}}(ctx context.Context, exec bob.Executor,{{$.Tables.RelDependenciesPos $.Aliases $rel}} related ...*{{$ftable.UpSingular}}) error {
+  func ({{$from}} *{{$tAlias.UpSingular}}) Attach{{$relAlias}}(ctx context.Context, exec bob.Executor,{{$.RelDependenciesPos $rel}} related ...*{{$.ModelType $rel.Foreign}}) error {
     if len(related) == 0 {
       return nil
     }
 
     var err error
-    {{$to}} := {{$ftable.UpSingular}}Slice(related)
+    {{$to}} := {{$.SliceType $rel.Foreign}}(related)
 
     {{range $index, $side := (reverse $valuedSides) -}}
-      {{$sideTable := $.Tables.Get $side.TableName}}
+      {{$sideTable := $.AllTables.Get $side.TableName}}
       {{$sideAlias := $.Aliases.Table $side.TableName}}
       {{$show := lt $index (len $valuedSides | add -1)}}
       {{if $show -}}
@@ -412,7 +412,7 @@
   }
 
   {{if  $rel.IsRemovable -}}
-  func (o *{{$tAlias.UpSingular}}) Detach{{$relAlias}}(ctx context.Context, exec bob.Executor, related ...*{{$ftable.UpSingular}}) {
+  func (o *{{$tAlias.UpSingular}}) Detach{{$relAlias}}(ctx context.Context, exec bob.Executor, related ...*{{$.ModelType $rel.Foreign}}) {
   }
   {{end -}}
 {{end -}}

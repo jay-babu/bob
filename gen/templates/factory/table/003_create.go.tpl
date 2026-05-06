@@ -54,7 +54,7 @@ func ensureCreatable{{$tAlias.UpSingular}}(m *models.{{$tAlias.UpSingular}}Sette
 func (o *{{$tAlias.UpSingular}}Template) insertOptRels(ctx context.Context, exec bob.Executor, m *models.{{$tAlias.UpSingular}}) (error) {
 	var err error
 
-	{{range $index, $rel := $.Relationships.Get $table.Key -}}{{if not ($.Tables.RelIsView $rel) -}}
+	{{range $index, $rel := $.Relationships.Get $table.Key -}}{{if not ($.AllTables.RelIsView $rel) -}}
 		{{- if ($table.RelIsRequired $rel)}}{{continue}}{{end -}}
 		{{- $relAlias := $tAlias.Relationship .Name -}}
 		{{- $invRel := $.Relationships.GetInverse . -}}
@@ -69,10 +69,10 @@ func (o *{{$tAlias.UpSingular}}Template) insertOptRels(ctx context.Context, exec
         ctx = {{$tAlias.DownSingular}}Rel{{$relAlias}}Ctx.WithValue(ctx, true);
 		{{- if .IsToMany -}}
 				for _, r := range o.r.{{$relAlias}} {
-          if r.o.alreadyPersisted {
+          if r.o.AlreadyPersisted() {
             m.R.{{$relAlias}} = append(m.R.{{$relAlias}}, r.o.Build())
           } else {
-            {{- range $.Tables.NeededBridgeRels . -}}
+            {{- range $.AllTables.NeededBridgeRels . -}}
               {{$alias := $.Aliases.Table .Table -}}
               {{if not .Many}}
                 {{$alias.DownSingular}}{{.Position}}, err := r.{{$alias.DownSingular}}.Create(ctx, exec)
@@ -92,7 +92,7 @@ func (o *{{$tAlias.UpSingular}}Template) insertOptRels(ctx context.Context, exec
             {{- if not $.RelationshipMutationMethods}}
             m.R.{{$relAlias}} = append(m.R.{{$relAlias}}, rel{{$index}}...)
             {{- else}}
-            err = m.Attach{{$relAlias}}(ctx, exec, {{$.Tables.RelArgs $.Aliases $rel}} rel{{$index}}...)
+            err = m.Attach{{$relAlias}}(ctx, exec, {{$.AllTables.RelArgs $.Aliases $rel}} rel{{$index}}...)
             if err != nil {
               return err
             }
@@ -100,10 +100,10 @@ func (o *{{$tAlias.UpSingular}}Template) insertOptRels(ctx context.Context, exec
 					}
 				}
 		{{- else -}}
-      if o.r.{{$relAlias}}.o.alreadyPersisted {
+      if o.r.{{$relAlias}}.o.AlreadyPersisted() {
         m.R.{{$relAlias}} = o.r.{{$relAlias}}.o.Build()
       } else {
-        {{- range $.Tables.NeededBridgeRels . -}}
+        {{- range $.AllTables.NeededBridgeRels . -}}
           {{$alias := $.Aliases.Table .Table -}}
           {{if not .Many}}
             {{$alias.DownSingular}}{{.Position}}, err := r.{{$alias.DownSingular}}.Create(ctx, exec)
@@ -123,7 +123,7 @@ func (o *{{$tAlias.UpSingular}}Template) insertOptRels(ctx context.Context, exec
         {{- if not $.RelationshipMutationMethods}}
         m.R.{{$relAlias}} = rel{{$index}}
         {{- else}}
-        err = m.Attach{{$relAlias}}(ctx, exec, {{$.Tables.RelArgs $.Aliases $rel}} rel{{$index}})
+        err = m.Attach{{$relAlias}}(ctx, exec, {{$.AllTables.RelArgs $.Aliases $rel}} rel{{$index}})
         if err != nil {
           return err
         }
@@ -198,7 +198,7 @@ func (o *{{$tAlias.UpSingular}}Template) Create(ctx context.Context, exec bob.Ex
 				{{$tAlias.UpSingular}}Mods.WithNew{{$relAlias}}().Apply(ctx, o)
 			}
 
-			if o.r.{{$relAlias}}.o.alreadyPersisted {
+			if o.r.{{$relAlias}}.o.AlreadyPersisted() {
 				rel{{$index}} = o.r.{{$relAlias}}.o.Build()
 			} else {
 				rel{{$index}}, err = o.r.{{$relAlias}}.o.Create(ctx, exec)
@@ -213,7 +213,7 @@ func (o *{{$tAlias.UpSingular}}Template) Create(ctx context.Context, exec bob.Ex
 					{{- if ne .ExternalTable $rel.Foreign}}{{continue}}{{end -}}
 					{{- $fromColA := index $tAlias.Columns .Column -}}
 					{{- $relIndex := printf "rel%d" $index -}}
-					opt.{{$fromColA}} = {{$.Tables.ColumnAssigner $.CurrentPackage $.Importer $.Types $.Aliases $.Table.Key $rel.Foreign .Column .ExternalColumn $relIndex true}}
+					opt.{{$fromColA}} = {{$.AllTables.ColumnAssigner $.CurrentPackage $.Importer $.Types $.Aliases $.Table.Key $rel.Foreign .Column .ExternalColumn $relIndex true}}
 				{{end}}
 			{{- end}}
 		}

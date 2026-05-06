@@ -1,3 +1,6 @@
+{{- $isSplit := and $.ModelSplit $.ModelSplit.Enabled -}}
+{{- $isFacade := and $isSplit (eq $.ModelSplit.Generation "facade") -}}
+{{- if not $isFacade -}}
 {{$.Importer.Import "context"}}
 
 type contextKey string
@@ -31,4 +34,4 @@ func (k contextual[V]) Value(ctx context.Context) (V, bool) {
   v, ok := ctx.Value(k.key).(V)
   return v, ok
 }
-
+{{end}}
