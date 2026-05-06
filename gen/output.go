@@ -279,6 +279,58 @@ func generateSplitModelOutput[T, C, I any](o *Output, data *TemplateData[T, C, I
 	return nil
 }
 
+func generateSplitFactoryOutput[T, C, I any](o *Output, data *TemplateData[T, C, I], generator string, noTests bool) error {
+	if data.ModelSplit == nil || !data.ModelSplit.Enabled {
+		return generateTableOutput(o, data, generator, noTests)
+	}
+
+	originalTables := data.Tables
+	originalPkgName := o.PkgName
+	originalOutFolder := o.OutFolder
+	originalSplit := data.ModelSplit
+	defer func() {
+		data.Tables = originalTables
+		o.PkgName = originalPkgName
+		o.OutFolder = originalOutFolder
+		data.ModelSplit = originalSplit
+	}()
+
+	factorySplit := modelSplitForOutput(originalSplit, o.OutFolder, data.OutputPackages[o.Key])
+	data.ModelSplit = factorySplit
+
+	if err := o.initOutFolders(); err != nil {
+		return fmt.Errorf("unable to initialize root factory output folder: %w", err)
+	}
+	if err := os.RemoveAll(filepath.Join(o.OutFolder, filepath.FromSlash(factorySplit.InternalDir))); err != nil {
+		return fmt.Errorf("removing old split factory output: %w", err)
+	}
+
+	data.Tables = originalTables
+	data.ModelSplit.Generation = modelSplitGenerationFacade
+	data.ModelSplit.CurrentComponent = nil
+	if err := generateSingletonOutput(o, data, generator, noTests); err != nil {
+		return fmt.Errorf("root facade singleton output: %w", err)
+	}
+
+	for _, component := range data.ModelSplit.Components {
+		componentOutput := *o
+		componentOutput.PkgName = component.Package
+		componentOutput.OutFolder = component.OutFolder
+		data.Tables = filterTablesForComponent(originalTables, component)
+		data.ModelSplit.Generation = modelSplitGenerationComponent
+		data.ModelSplit.CurrentComponent = component
+
+		if err := generateSingletonOutput(&componentOutput, data, generator, noTests); err != nil {
+			return fmt.Errorf("component %s singleton output: %w", component.ID, err)
+		}
+		if err := generateTableOutput(&componentOutput, data, generator, noTests); err != nil {
+			return fmt.Errorf("component %s table output: %w", component.ID, err)
+		}
+	}
+
+	return nil
+}
+
 func generateQueryOutput[T, C, I any](o *Output, data *TemplateData[T, C, I], generator string, noTests bool) error {
 	if o.queryTemplates == nil || len(o.queryTemplates.Templates()) == 0 {
 		return nil

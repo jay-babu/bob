@@ -210,3 +210,39 @@ func filterTablesForComponent[C, I any](tables drivers.Tables[C, I], component *
 	}
 	return filtered
 }
+
+func modelSplitForOutput(split *ModelSplitData, rootOutFolder, rootPackagePath string) *ModelSplitData {
+	if split == nil || !split.Enabled {
+		return split
+	}
+
+	clone := &ModelSplitData{
+		Enabled:         split.Enabled,
+		Mode:            split.Mode,
+		InternalDir:     split.InternalDir,
+		RootOutFolder:   rootOutFolder,
+		RootPackagePath: rootPackagePath,
+		Generation:      split.Generation,
+		Components:      make([]*ModelSplitComponent, 0, len(split.Components)),
+		TableComponents: make(map[string]*ModelSplitComponent, len(split.TableComponents)),
+	}
+
+	for _, component := range split.Components {
+		c := &ModelSplitComponent{
+			ID:          component.ID,
+			Package:     component.Package,
+			OutFolder:   filepath.Join(rootOutFolder, filepath.FromSlash(split.InternalDir), component.Package),
+			PackagePath: path.Join(rootPackagePath, filepath.ToSlash(split.InternalDir), component.Package),
+			TableKeys:   slices.Clone(component.TableKeys),
+		}
+		clone.Components = append(clone.Components, c)
+		if split.CurrentComponent != nil && split.CurrentComponent.ID == component.ID {
+			clone.CurrentComponent = c
+		}
+		for _, tableKey := range c.TableKeys {
+			clone.TableComponents[tableKey] = c
+		}
+	}
+
+	return clone
+}

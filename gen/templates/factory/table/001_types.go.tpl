@@ -21,6 +21,10 @@ func (mods {{$tAlias.UpSingular}}ModSlice) Apply(ctx context.Context, n *{{$tAli
     }
 }
 
+type {{$tAlias.DownSingular}}Factory interface {
+    {{$.FactoryDependencyMethods $table.Key}}
+}
+
 // {{$tAlias.UpSingular}}Template is an object representing the database table.
 // all columns are optional and should be set by mods
 type {{$tAlias.UpSingular}}Template struct {
@@ -35,7 +39,7 @@ type {{$tAlias.UpSingular}}Template struct {
     {{if $.Relationships.Get $table.Key -}}
         r {{$tAlias.DownSingular}}R
     {{- end}}
-    f *Factory
+    f {{$tAlias.DownSingular}}Factory
 
     alreadyPersisted bool
     requireAll       bool
@@ -63,10 +67,51 @@ type {{$tAlias.DownSingular}}R{{$relAlias}}R struct{
     {{- if .IsToMany}}
         number int
     {{- end}}
-    o *{{$ftable.UpSingular}}Template
-    {{$.Tables.RelDependenciesTyp $.Aliases .}}
+    o *{{$.FactoryTemplateType .Foreign}}
+    {{$.FactoryRelDependenciesTyp .}}
 }
 {{end}}
+
+func New{{$tAlias.UpSingular}}WithContext(ctx context.Context, f {{$tAlias.DownSingular}}Factory, baseMods {{$tAlias.UpSingular}}ModSlice, mods ...{{$tAlias.UpSingular}}Mod) *{{$tAlias.UpSingular}}Template {
+	o := &{{$tAlias.UpSingular}}Template{f: f}
+
+	baseMods.Apply(ctx, o)
+	{{$tAlias.UpSingular}}ModSlice(mods).Apply(ctx, o)
+
+	return o
+}
+
+func FromExisting{{$tAlias.UpSingular}}(f {{$tAlias.DownSingular}}Factory, m *models.{{$tAlias.UpSingular}}) *{{$tAlias.UpSingular}}Template {
+	o := &{{$tAlias.UpSingular}}Template{f: f, alreadyPersisted: true}
+
+  {{range $column := $table.Columns -}}
+  {{$colAlias := $tAlias.Column $column.Name -}}
+  {{- $colTyp := $.Types.GetNullable $.CurrentPackage $.Importer $column.Type $column.Nullable -}}
+        o.{{$colAlias}} = func() {{$colTyp}} { return m.{{$colAlias}} }
+  {{end}}
+
+  {{if $.Relationships.Get $table.Key -}}
+  ctx := context.Background()
+  {{- end}}
+  {{range $.Relationships.Get $table.Key -}}
+    {{$relAlias := $tAlias.Relationship .Name -}}
+    {{if .IsToMany -}}
+      if len(m.R.{{$relAlias}}) > 0 {
+      {{$tAlias.UpSingular}}Mods.AddExisting{{$relAlias}}(m.R.{{$relAlias}}...).Apply(ctx, o)
+      }
+    {{- else -}}
+      if m.R.{{$relAlias}} != nil {
+      {{$tAlias.UpSingular}}Mods.WithExisting{{$relAlias}}(m.R.{{$relAlias}}).Apply(ctx, o)
+      }
+    {{- end}}
+  {{end}}
+
+  return o
+}
+
+func (o *{{$tAlias.UpSingular}}Template) AlreadyPersisted() bool {
+	return o.alreadyPersisted
+}
 
 // Apply mods to the {{$tAlias.UpSingular}}Template
 func (o *{{$tAlias.UpSingular}}Template) Apply(ctx context.Context, mods ...{{$tAlias.UpSingular}}Mod) {
