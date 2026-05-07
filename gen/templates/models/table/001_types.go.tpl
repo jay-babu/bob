@@ -131,6 +131,20 @@ type {{$tAlias.DownSingular}}Column struct {
 	name  string
 }
 
+// AliasedAs returns a copy of the column qualified by alias.
+func (c {{$tAlias.DownSingular}}Column) AliasedAs(alias string) {{$tAlias.DownSingular}}Column {
+	return {{$tAlias.DownSingular}}Column{
+		Expression: {{$.Dialect}}.Quote(alias, c.name),
+		alias:      alias,
+		name:       c.name,
+	}
+}
+
+// Alias returns the current table alias for the column.
+func (c {{$tAlias.DownSingular}}Column) Alias() string {
+	return c.alias
+}
+
 // Name returns the unqualified column name.
 func (c {{$tAlias.DownSingular}}Column) Name() string {
 	return c.name
