@@ -251,6 +251,11 @@ func (d *TemplateData[T, C, I]) BuildPreloaderFunc(tableKey string) string {
 	return d.splitRef(tableKey, "Build"+alias.UpSingular+"Preloader")
 }
 
+func (d *TemplateData[T, C, I]) ScanMapperNullableFunc(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, alias.UpSingular+"ScanMapperNullable")
+}
+
 func (d *TemplateData[T, C, I]) ThenLoaderType(tableKey string) string {
 	alias := d.TableAlias(tableKey)
 	return d.splitRef(tableKey, alias.UpSingular+"ThenLoader")
@@ -360,7 +365,7 @@ func (d *TemplateData[T, C, I]) FactoryDependencyMethods(tableKey string) string
 		alias := d.TableAlias(dep)
 		methods = append(methods,
 			fmt.Sprintf("New%sWithContext(context.Context, ...%s) *%s", alias.UpSingular, d.FactoryModType(dep), d.FactoryTemplateType(dep)),
-			fmt.Sprintf("FromExisting%s(*models.%s) *%s", alias.UpSingular, alias.UpSingular, d.FactoryTemplateType(dep)),
+			fmt.Sprintf("FromExisting%s(context.Context, *models.%s) *%s", alias.UpSingular, alias.UpSingular, d.FactoryTemplateType(dep)),
 		)
 	}
 
