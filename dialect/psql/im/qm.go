@@ -119,6 +119,11 @@ func Excluded(column string) dialect.Expression {
 	)
 }
 
+// SetCols creates a multi-column setter: (columns...) = ROW(...) | (values...) | (subquery)
+func SetCols(columns ...string) dialect.SetCols[*clause.ConflictClause] {
+	return dialect.NewSetCols[*clause.ConflictClause](columns...)
+}
+
 func SetExcluded(cols ...string) bob.Mod[*clause.ConflictClause] {
 	exprs := make([]bob.Expression, 0, len(cols))
 	for _, col := range cols {
