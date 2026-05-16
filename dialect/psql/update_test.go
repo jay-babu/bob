@@ -342,3 +342,16 @@ func TestUpdateWhereCurrentOfConflict(t *testing.T) {
 		t.Fatal("expected error when both WHERE and WHERE CURRENT OF are set")
 	}
 }
+
+func TestUpdateWhereCurrentOfConflict(t *testing.T) {
+	_, _, err := bob.Build(context.Background(), psql.Update(
+		um.Table("films"),
+		um.SetCol("kind").ToArg("Dramatic"),
+		um.Where(psql.Quote("kind").EQ(psql.Arg("Drama"))),
+		um.WhereCurrentOf("c_films"),
+	))
+
+	if err == nil {
+		t.Fatal("expected error when both WHERE and WHERE CURRENT OF are set")
+	}
+}
