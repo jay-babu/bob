@@ -124,6 +124,14 @@ func SetCols(columns ...string) dialect.SetCols[*clause.ConflictClause] {
 	return dialect.NewSetCols[*clause.ConflictClause](columns...)
 }
 
+// Excluded references a column from the EXCLUDED pseudo-table in ON CONFLICT DO UPDATE.
+//
+//	SQL: EXCLUDED."col"
+//	Go: im.Excluded("col")
+func Excluded(column string) bob.Expression {
+	return expr.Glue(expr.Raw("EXCLUDED."), expr.Quote(column))
+}
+
 func SetExcluded(cols ...string) bob.Mod[*clause.ConflictClause] {
 	exprs := make([]bob.Expression, 0, len(cols))
 	for _, col := range cols {

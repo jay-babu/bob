@@ -115,6 +115,11 @@ func Excluded(column string) dialect.Expression {
 	)
 }
 
+// Excluded references a column from the EXCLUDED pseudo-table in ON CONFLICT DO UPDATE.
+func Excluded(column string) bob.Expression {
+	return expr.Glue(expr.Raw("EXCLUDED."), expr.Quote(column))
+}
+
 func SetExcluded(cols ...string) bob.Mod[*clause.ConflictClause] {
 	exprs := make([]bob.Expression, 0, len(cols))
 	for _, col := range cols {
