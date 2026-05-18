@@ -116,8 +116,8 @@ func Excluded(column string) dialect.Expression {
 }
 
 // Excluded references a column from the EXCLUDED pseudo-table in ON CONFLICT DO UPDATE.
-func Excluded(column string) bob.Expression {
-	return expr.Glue(expr.Raw("EXCLUDED."), expr.Quote(column))
+func Excluded(column string) dialect.Expression {
+	return dialect.Expression{}.New(expr.Glue(expr.Raw("EXCLUDED."), expr.Quote(column)))
 }
 
 func SetExcluded(cols ...string) bob.Mod[*clause.ConflictClause] {
