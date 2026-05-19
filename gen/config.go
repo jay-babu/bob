@@ -1,7 +1,7 @@
 package gen
 
 import (
-	"github.com/stephenafamo/bob/gen/drivers"
+	"github.com/jay-babu/bob/gen/drivers"
 )
 
 // Config for the running of the commands

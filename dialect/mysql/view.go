@@ -4,12 +4,12 @@ import (
 	"context"
 	"reflect"
 
-	"github.com/stephenafamo/bob"
-	"github.com/stephenafamo/bob/dialect/mysql/dialect"
-	"github.com/stephenafamo/bob/dialect/mysql/sm"
-	"github.com/stephenafamo/bob/expr"
-	"github.com/stephenafamo/bob/internal/mappings"
-	"github.com/stephenafamo/bob/orm"
+	"github.com/jay-babu/bob"
+	"github.com/jay-babu/bob/dialect/mysql/dialect"
+	"github.com/jay-babu/bob/dialect/mysql/sm"
+	"github.com/jay-babu/bob/expr"
+	"github.com/jay-babu/bob/internal/mappings"
+	"github.com/jay-babu/bob/orm"
 	"github.com/stephenafamo/scan"
 )
 

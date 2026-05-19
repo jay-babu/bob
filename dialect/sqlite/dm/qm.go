@@ -1,9 +1,9 @@
 package dm
 
 import (
-	"github.com/stephenafamo/bob"
-	"github.com/stephenafamo/bob/dialect/sqlite/dialect"
-	"github.com/stephenafamo/bob/mods"
+	"github.com/jay-babu/bob"
+	"github.com/jay-babu/bob/dialect/sqlite/dialect"
+	"github.com/jay-babu/bob/mods"
 )
 
 func With(name string, columns ...string) dialect.CTEChain[*dialect.DeleteQuery] {

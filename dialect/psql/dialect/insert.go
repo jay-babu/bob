@@ -4,8 +4,8 @@ import (
 	"context"
 	"io"
 
-	"github.com/stephenafamo/bob"
-	"github.com/stephenafamo/bob/clause"
+	"github.com/jay-babu/bob"
+	"github.com/jay-babu/bob/clause"
 )
 
 // OverridingType represents the OVERRIDING type for INSERT actions (used in both INSERT and MERGE)

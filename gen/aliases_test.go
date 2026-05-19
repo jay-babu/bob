@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stephenafamo/bob/gen/drivers"
+	"github.com/jay-babu/bob/gen/drivers"
 )
 
 func TestValidateAliases_NoConflicts(t *testing.T) {

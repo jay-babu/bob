@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/stephenafamo/bob"
-	"github.com/stephenafamo/bob/clause"
+	"github.com/jay-babu/bob"
+	"github.com/jay-babu/bob/clause"
 )
 
 // MergeWhenType represents the type of WHEN clause in MERGE statement

@@ -4,8 +4,8 @@ import (
 	"cmp"
 	"fmt"
 
-	"github.com/stephenafamo/bob/gen"
-	"github.com/stephenafamo/bob/internal"
+	"github.com/jay-babu/bob/gen"
+	"github.com/jay-babu/bob/internal"
 )
 
 func Setup[T, C, I any](config Config, templates gen.Templates) []gen.Plugin {

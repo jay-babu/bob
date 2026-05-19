@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/stephenafamo/bob/gen/drivers"
+	"github.com/jay-babu/bob/gen/drivers"
 )
 
 type QueryParser interface {

@@ -1,9 +1,9 @@
 package psql
 
 import (
-	"github.com/stephenafamo/bob"
-	"github.com/stephenafamo/bob/dialect/psql/dialect"
-	"github.com/stephenafamo/bob/orm"
+	"github.com/jay-babu/bob"
+	"github.com/jay-babu/bob/dialect/psql/dialect"
+	"github.com/jay-babu/bob/orm"
 )
 
 type (

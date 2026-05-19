@@ -7,7 +7,7 @@ import (
 	"strconv"
 
 	pg "github.com/pganalyze/pg_query_go/v6"
-	"github.com/stephenafamo/bob/gen/drivers"
+	"github.com/jay-babu/bob/gen/drivers"
 )
 
 type tables = drivers.Tables[any, IndexExtra]

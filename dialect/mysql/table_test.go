@@ -8,13 +8,13 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stephenafamo/bob"
-	"github.com/stephenafamo/bob/clause"
-	"github.com/stephenafamo/bob/dialect/mysql/dialect"
-	"github.com/stephenafamo/bob/expr"
-	"github.com/stephenafamo/bob/internal"
-	"github.com/stephenafamo/bob/orm"
-	testutils "github.com/stephenafamo/bob/test/utils"
+	"github.com/jay-babu/bob"
+	"github.com/jay-babu/bob/clause"
+	"github.com/jay-babu/bob/dialect/mysql/dialect"
+	"github.com/jay-babu/bob/expr"
+	"github.com/jay-babu/bob/internal"
+	"github.com/jay-babu/bob/orm"
+	testutils "github.com/jay-babu/bob/test/utils"
 )
 
 type WithAutoIncr struct {

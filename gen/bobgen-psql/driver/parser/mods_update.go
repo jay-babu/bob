@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	pg "github.com/pganalyze/pg_query_go/v6"
-	"github.com/stephenafamo/bob/internal"
+	"github.com/jay-babu/bob/internal"
 )
 
 func (w *walker) modUpdateStatement(stmt *pg.Node_UpdateStmt, info nodeInfo) {

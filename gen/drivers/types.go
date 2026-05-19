@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/stephenafamo/bob/gen/language"
+	"github.com/jay-babu/bob/gen/language"
 )
 
 type Type struct {

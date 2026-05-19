@@ -5,7 +5,7 @@ import (
 	"strconv"
 
 	pg "github.com/pganalyze/pg_query_go/v6"
-	"github.com/stephenafamo/bob/internal"
+	"github.com/jay-babu/bob/internal"
 )
 
 func (w *walker) modMergeStatement(stmt *pg.Node_MergeStmt, info nodeInfo) {

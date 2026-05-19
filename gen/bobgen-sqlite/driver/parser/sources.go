@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/stephenafamo/bob/gen/bobgen-helpers/parser"
-	antlrhelpers "github.com/stephenafamo/bob/gen/bobgen-helpers/parser/antlrhelpers"
-	"github.com/stephenafamo/bob/internal"
+	"github.com/jay-babu/bob/gen/bobgen-helpers/parser"
+	antlrhelpers "github.com/jay-babu/bob/gen/bobgen-helpers/parser/antlrhelpers"
+	"github.com/jay-babu/bob/internal"
 	sqliteparser "github.com/stephenafamo/sqlparser/sqlite"
 )
 

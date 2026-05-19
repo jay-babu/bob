@@ -13,11 +13,11 @@ import (
 	"testing"
 
 	_ "github.com/lib/pq"
-	"github.com/stephenafamo/bob/gen"
-	helpers "github.com/stephenafamo/bob/gen/bobgen-helpers"
-	"github.com/stephenafamo/bob/gen/drivers"
-	testfiles "github.com/stephenafamo/bob/test/files"
-	testgen "github.com/stephenafamo/bob/test/gen"
+	"github.com/jay-babu/bob/gen"
+	helpers "github.com/jay-babu/bob/gen/bobgen-helpers"
+	"github.com/jay-babu/bob/gen/drivers"
+	testfiles "github.com/jay-babu/bob/test/files"
+	testgen "github.com/jay-babu/bob/test/gen"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 )

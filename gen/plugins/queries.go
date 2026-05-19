@@ -5,8 +5,8 @@ import (
 	"io/fs"
 	"slices"
 
-	"github.com/stephenafamo/bob/gen"
-	"github.com/stephenafamo/bob/gen/drivers"
+	"github.com/jay-babu/bob/gen"
+	"github.com/jay-babu/bob/gen/drivers"
 )
 
 func Queries[T, C, I any](templates ...fs.FS) gen.Plugin {

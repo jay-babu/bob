@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/stephenafamo/bob/gen/language"
+	"github.com/jay-babu/bob/gen/language"
 	"github.com/volatiletech/strmangle"
 )
 

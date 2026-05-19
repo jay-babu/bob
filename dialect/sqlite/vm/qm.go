@@ -1,9 +1,9 @@
 package vm
 
 import (
-	"github.com/stephenafamo/bob"
-	"github.com/stephenafamo/bob/dialect/sqlite/dialect"
-	"github.com/stephenafamo/bob/mods"
+	"github.com/jay-babu/bob"
+	"github.com/jay-babu/bob/dialect/sqlite/dialect"
+	"github.com/jay-babu/bob/mods"
 )
 
 func RowValue(clauses ...bob.Expression) bob.Mod[*dialect.ValuesQuery] {

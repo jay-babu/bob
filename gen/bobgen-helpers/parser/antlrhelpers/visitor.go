@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"sync/atomic"
 
-	"github.com/stephenafamo/bob/gen/bobgen-helpers/parser"
-	"github.com/stephenafamo/bob/gen/drivers"
-	"github.com/stephenafamo/bob/internal"
+	"github.com/jay-babu/bob/gen/bobgen-helpers/parser"
+	"github.com/jay-babu/bob/gen/drivers"
+	"github.com/jay-babu/bob/internal"
 )
 
 type Visitor[C, I any] struct {

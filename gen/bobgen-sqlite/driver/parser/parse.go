@@ -7,11 +7,11 @@ import (
 	"strings"
 
 	"github.com/antlr4-go/antlr/v4"
-	"github.com/stephenafamo/bob/gen/bobgen-helpers/parser"
-	antlrhelpers "github.com/stephenafamo/bob/gen/bobgen-helpers/parser/antlrhelpers"
-	"github.com/stephenafamo/bob/gen/drivers"
-	"github.com/stephenafamo/bob/gen/language"
-	"github.com/stephenafamo/bob/internal"
+	"github.com/jay-babu/bob/gen/bobgen-helpers/parser"
+	antlrhelpers "github.com/jay-babu/bob/gen/bobgen-helpers/parser/antlrhelpers"
+	"github.com/jay-babu/bob/gen/drivers"
+	"github.com/jay-babu/bob/gen/language"
+	"github.com/jay-babu/bob/internal"
 	sqliteparser "github.com/stephenafamo/sqlparser/sqlite"
 )
 

@@ -3,10 +3,10 @@ package psql_test
 import (
 	"testing"
 
-	"github.com/stephenafamo/bob/dialect/psql"
-	"github.com/stephenafamo/bob/dialect/psql/mm"
-	"github.com/stephenafamo/bob/dialect/psql/sm"
-	testutils "github.com/stephenafamo/bob/test/utils"
+	"github.com/jay-babu/bob/dialect/psql"
+	"github.com/jay-babu/bob/dialect/psql/mm"
+	"github.com/jay-babu/bob/dialect/psql/sm"
+	testutils "github.com/jay-babu/bob/test/utils"
 )
 
 func TestMerge(t *testing.T) {

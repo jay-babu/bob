@@ -3,8 +3,8 @@ package gen
 import (
 	"testing"
 
-	"github.com/stephenafamo/bob/gen/drivers"
-	"github.com/stephenafamo/bob/orm"
+	"github.com/jay-babu/bob/gen/drivers"
+	"github.com/jay-babu/bob/orm"
 	"github.com/volatiletech/strmangle"
 )
 

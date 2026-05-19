@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/stephenafamo/bob/internal"
-	"github.com/stephenafamo/bob/orm"
+	"github.com/jay-babu/bob/internal"
+	"github.com/jay-babu/bob/orm"
 )
 
 // Table metadata from the database schema.

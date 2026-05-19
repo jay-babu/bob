@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/antlr4-go/antlr/v4"
-	"github.com/stephenafamo/bob/internal"
+	"github.com/jay-babu/bob/internal"
 	sqliteparser "github.com/stephenafamo/sqlparser/sqlite"
 )
 

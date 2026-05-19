@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 
 	pg "github.com/pganalyze/pg_query_go/v6"
-	"github.com/stephenafamo/bob/internal"
+	"github.com/jay-babu/bob/internal"
 )
 
 const (

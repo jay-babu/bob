@@ -1,6 +1,6 @@
 package helpers
 
-import "github.com/stephenafamo/bob/gen/drivers"
+import "github.com/jay-babu/bob/gen/drivers"
 
 //nolint:maintidx
 func Types() drivers.Types {
@@ -48,7 +48,7 @@ func Types() drivers.Types {
 			RandomExpr: `return f.UInt64()`,
 		},
 		"types.Uint64": {
-			Imports:    []string{`"github.com/stephenafamo/bob/types"`},
+			Imports:    []string{`"github.com/jay-babu/bob/types"`},
 			RandomExpr: `return BASETYPE(f.UInt64())`,
 		},
 		"float32": {
@@ -136,7 +136,7 @@ func Types() drivers.Types {
 			NoScannerValuerTest: true,
 		},
 		"types.Time": {
-			Imports:   []string{`"github.com/stephenafamo/bob/types"`},
+			Imports:   []string{`"github.com/jay-babu/bob/types"`},
 			DependsOn: []string{"time.Time"},
 			RandomExpr: `
 				return types.Time{Time: random_time_Time(f, limits...)}`,
@@ -146,7 +146,7 @@ func Types() drivers.Types {
 		"types.Text[netip.Addr, *netip.Addr]": {
 			Imports: []string{
 				`"net/netip"`,
-				`"github.com/stephenafamo/bob/types"`,
+				`"github.com/jay-babu/bob/types"`,
 			},
 			RandomExpr: `var addr [4]byte
                 rand.Read(addr[:])
@@ -157,7 +157,7 @@ func Types() drivers.Types {
 		"types.Text[netip.Prefix, *netip.Prefix]": {
 			Imports: []string{
 				`"net/netip"`,
-				`"github.com/stephenafamo/bob/types"`,
+				`"github.com/jay-babu/bob/types"`,
 			},
 			RandomExpr: `var addr [4]byte
                 rand.Read(addr[:])
@@ -168,7 +168,7 @@ func Types() drivers.Types {
 		},
 		"pgtypes.Inet": {
 			Imports: []string{
-				`"github.com/stephenafamo/bob/types/pgtypes"`,
+				`"github.com/jay-babu/bob/types/pgtypes"`,
 			},
 			RandomExpr: `var addr [4]byte
                 rand.Read(addr[:])
@@ -178,7 +178,7 @@ func Types() drivers.Types {
 			RandomExprImports: []string{`"crypto/rand"`, `"net/netip"`},
 		},
 		"pgtypes.Macaddr": {
-			Imports: []string{`"github.com/stephenafamo/bob/types/pgtypes"`},
+			Imports: []string{`"github.com/jay-babu/bob/types/pgtypes"`},
 			RandomExpr: `addr, _ := net.ParseMAC(f.Internet().MacAddress())
                 return pgtypes.Macaddr{Addr: addr}`,
 			RandomExprImports:  []string{`"net"`},
@@ -380,11 +380,11 @@ func Types() drivers.Types {
 			CompareExpr:       `AAA.Equal(BBB)`,
 		},
 		"pgtypes.LSN": {
-			Imports:    []string{`"github.com/stephenafamo/bob/types/pgtypes"`},
+			Imports:    []string{`"github.com/jay-babu/bob/types/pgtypes"`},
 			RandomExpr: `return pgtypes.LSN(f.UInt64())`,
 		},
 		"pgtypes.Snapshot": {
-			Imports: []string{`"github.com/stephenafamo/bob/types/pgtypes"`},
+			Imports: []string{`"github.com/jay-babu/bob/types/pgtypes"`},
 			RandomExpr: `
 				min := f.UInt32()
 				max := f.UInt32Between(min, math.MaxUint32)
@@ -409,7 +409,7 @@ func Types() drivers.Types {
 		},
 		"pgtypes.HStore": {
 			DependsOn: []string{"string"},
-			Imports:   []string{`"github.com/stephenafamo/bob/types/pgtypes"`},
+			Imports:   []string{`"github.com/jay-babu/bob/types/pgtypes"`},
 			RandomExpr: `hs := make(pgtypes.HStore)
                 for range f.IntBetween(1, 5) {
 					hs[random_string(f)] = sql.Null[string]{V: random_string(f, limits...), Valid: f.Bool()}
@@ -421,7 +421,7 @@ func Types() drivers.Types {
 		"types.JSON[json.RawMessage]": {
 			Imports: []string{
 				`"encoding/json"`,
-				`"github.com/stephenafamo/bob/types"`,
+				`"github.com/jay-babu/bob/types"`,
 			},
 			RandomExpr: `s := &bytes.Buffer{}
                 s.WriteRune('{')

@@ -4,8 +4,8 @@ import (
 	"context"
 	"io"
 
-	"github.com/stephenafamo/bob"
-	"github.com/stephenafamo/bob/expr"
+	"github.com/jay-babu/bob"
+	"github.com/jay-babu/bob/expr"
 )
 
 const (

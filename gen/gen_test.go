@@ -3,8 +3,8 @@ package gen
 import (
 	"testing"
 
-	"github.com/stephenafamo/bob/gen/drivers"
-	"github.com/stephenafamo/bob/internal"
+	"github.com/jay-babu/bob/gen/drivers"
+	"github.com/jay-babu/bob/internal"
 )
 
 func TestProcessTypeReplacements(t *testing.T) {

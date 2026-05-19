@@ -9,11 +9,11 @@ import (
 	"sync/atomic"
 
 	pg "github.com/pganalyze/pg_query_go/v6"
-	"github.com/stephenafamo/bob"
-	"github.com/stephenafamo/bob/gen/bobgen-helpers/parser"
-	"github.com/stephenafamo/bob/gen/drivers"
-	"github.com/stephenafamo/bob/gen/language"
-	"github.com/stephenafamo/bob/internal"
+	"github.com/jay-babu/bob"
+	"github.com/jay-babu/bob/gen/bobgen-helpers/parser"
+	"github.com/jay-babu/bob/gen/drivers"
+	"github.com/jay-babu/bob/gen/language"
+	"github.com/jay-babu/bob/internal"
 	pgparse "github.com/wasilibs/go-pgquery"
 )
 

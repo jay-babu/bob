@@ -1,8 +1,8 @@
 package mods
 
 import (
-	"github.com/stephenafamo/bob"
-	"github.com/stephenafamo/bob/clause"
+	"github.com/jay-babu/bob"
+	"github.com/jay-babu/bob/clause"
 )
 
 var (

@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/antlr4-go/antlr/v4"
-	"github.com/stephenafamo/bob/internal"
+	"github.com/jay-babu/bob/internal"
 	mysqlparser "github.com/stephenafamo/sqlparser/mysql"
 )
 
@@ -56,7 +56,7 @@ func (v *visitor) modSelectStatement(ctx mysqlparser.ISelectStatementContext, sb
 	compounds := ctx.AllSetQueryPart()
 
 	if len(compounds) > 0 {
-		imports = append(imports, []string{"github.com/stephenafamo/bob/clause"})
+		imports = append(imports, []string{"github.com/jay-babu/bob/clause"})
 	}
 
 	for _, compound := range compounds {

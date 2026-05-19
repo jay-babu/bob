@@ -4,14 +4,14 @@ import (
 	"context"
 	"reflect"
 
-	"github.com/stephenafamo/bob"
-	"github.com/stephenafamo/bob/dialect/sqlite/dialect"
-	"github.com/stephenafamo/bob/dialect/sqlite/dm"
-	"github.com/stephenafamo/bob/dialect/sqlite/im"
-	"github.com/stephenafamo/bob/dialect/sqlite/um"
-	"github.com/stephenafamo/bob/expr"
-	"github.com/stephenafamo/bob/internal/mappings"
-	"github.com/stephenafamo/bob/orm"
+	"github.com/jay-babu/bob"
+	"github.com/jay-babu/bob/dialect/sqlite/dialect"
+	"github.com/jay-babu/bob/dialect/sqlite/dm"
+	"github.com/jay-babu/bob/dialect/sqlite/im"
+	"github.com/jay-babu/bob/dialect/sqlite/um"
+	"github.com/jay-babu/bob/expr"
+	"github.com/jay-babu/bob/internal/mappings"
+	"github.com/jay-babu/bob/orm"
 )
 
 type (

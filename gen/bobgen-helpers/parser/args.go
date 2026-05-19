@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/stephenafamo/bob/gen/drivers"
+	"github.com/jay-babu/bob/gen/drivers"
 )
 
 func GetArgs(bindArgs, groupArgs []drivers.QueryArg) []drivers.QueryArg {

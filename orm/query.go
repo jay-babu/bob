@@ -6,7 +6,7 @@ import (
 	"io"
 	"iter"
 
-	"github.com/stephenafamo/bob"
+	"github.com/jay-babu/bob"
 	"github.com/stephenafamo/scan"
 )
 

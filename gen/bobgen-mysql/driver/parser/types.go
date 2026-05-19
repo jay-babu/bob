@@ -3,8 +3,8 @@ package parser
 import (
 	"slices"
 
-	"github.com/stephenafamo/bob/gen/bobgen-helpers/parser/antlrhelpers"
-	"github.com/stephenafamo/bob/gen/drivers"
+	"github.com/jay-babu/bob/gen/bobgen-helpers/parser/antlrhelpers"
+	"github.com/jay-babu/bob/gen/drivers"
 	mysqlparser "github.com/stephenafamo/sqlparser/mysql"
 )
 

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/stephenafamo/bob/internal"
+	"github.com/jay-babu/bob/internal"
 	sqliteparser "github.com/stephenafamo/sqlparser/sqlite"
 )
 
@@ -117,7 +117,7 @@ func (v *visitor) modSelect_stmt(ctx sqliteparser.ISelect_stmtContext, sb *strin
 	compounds := ctx.AllCompound_select()
 
 	if len(compounds) > 0 {
-		imports = append(imports, []string{"github.com/stephenafamo/bob/clause"})
+		imports = append(imports, []string{"github.com/jay-babu/bob/clause"})
 	}
 
 	for _, compound := range compounds {

@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/antlr4-go/antlr/v4"
-	"github.com/stephenafamo/bob/gen/bobgen-helpers/parser/antlrhelpers"
+	"github.com/jay-babu/bob/gen/bobgen-helpers/parser/antlrhelpers"
 	mysqlparser "github.com/stephenafamo/sqlparser/mysql"
 )
 

@@ -1,6 +1,6 @@
 package gen
 
-import "github.com/stephenafamo/bob/gen/drivers"
+import "github.com/jay-babu/bob/gen/drivers"
 
 type Constraints[C any] map[string]drivers.Constraints[C]
 

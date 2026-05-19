@@ -15,9 +15,9 @@ import (
 	"github.com/knadh/koanf/providers/env"
 	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/v2"
-	"github.com/stephenafamo/bob/gen"
-	"github.com/stephenafamo/bob/gen/drivers"
-	"github.com/stephenafamo/bob/gen/plugins"
+	"github.com/jay-babu/bob/gen"
+	"github.com/jay-babu/bob/gen/drivers"
+	"github.com/jay-babu/bob/gen/plugins"
 )
 
 const DefaultConfigPath = "./bobgen.yaml"

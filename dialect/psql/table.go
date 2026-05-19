@@ -4,16 +4,16 @@ import (
 	"context"
 	"reflect"
 
-	"github.com/stephenafamo/bob"
-	"github.com/stephenafamo/bob/dialect/psql/dialect"
-	"github.com/stephenafamo/bob/dialect/psql/dm"
-	"github.com/stephenafamo/bob/dialect/psql/im"
-	"github.com/stephenafamo/bob/dialect/psql/mm"
-	"github.com/stephenafamo/bob/dialect/psql/um"
-	"github.com/stephenafamo/bob/expr"
-	"github.com/stephenafamo/bob/internal"
-	"github.com/stephenafamo/bob/internal/mappings"
-	"github.com/stephenafamo/bob/orm"
+	"github.com/jay-babu/bob"
+	"github.com/jay-babu/bob/dialect/psql/dialect"
+	"github.com/jay-babu/bob/dialect/psql/dm"
+	"github.com/jay-babu/bob/dialect/psql/im"
+	"github.com/jay-babu/bob/dialect/psql/mm"
+	"github.com/jay-babu/bob/dialect/psql/um"
+	"github.com/jay-babu/bob/expr"
+	"github.com/jay-babu/bob/internal"
+	"github.com/jay-babu/bob/internal/mappings"
+	"github.com/jay-babu/bob/orm"
 )
 
 type (

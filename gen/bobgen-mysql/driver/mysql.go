@@ -11,9 +11,9 @@ import (
 
 	"github.com/aarondl/opt/null"
 	"github.com/go-sql-driver/mysql"
-	helpers "github.com/stephenafamo/bob/gen/bobgen-helpers"
-	"github.com/stephenafamo/bob/gen/bobgen-mysql/driver/parser"
-	"github.com/stephenafamo/bob/gen/drivers"
+	helpers "github.com/jay-babu/bob/gen/bobgen-helpers"
+	"github.com/jay-babu/bob/gen/bobgen-mysql/driver/parser"
+	"github.com/jay-babu/bob/gen/drivers"
 	"github.com/stephenafamo/scan"
 	"github.com/stephenafamo/scan/stdscan"
 	"github.com/volatiletech/strmangle"

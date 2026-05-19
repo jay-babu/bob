@@ -5,7 +5,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/stephenafamo/bob"
+	"github.com/jay-babu/bob"
 )
 
 var ErrEmptySetExpression = errors.New("SET clause must have at least one assignment expression")

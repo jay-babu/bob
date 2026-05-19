@@ -1,6 +1,6 @@
 package plugins
 
-import "github.com/stephenafamo/bob/gen"
+import "github.com/jay-babu/bob/gen"
 
 var (
 	_ gen.StatePlugin[any]            = &enumsPlugin[any, any, any]{}

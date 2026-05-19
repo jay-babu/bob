@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/stephenafamo/bob"
+	"github.com/jay-babu/bob"
 )
 
 type Chain[T bob.Expression, B builder[T]] struct {

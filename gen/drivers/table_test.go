@@ -3,7 +3,7 @@ package drivers
 import (
 	"testing"
 
-	"github.com/stephenafamo/bob/orm"
+	"github.com/jay-babu/bob/orm"
 )
 
 func TestGetTable(t *testing.T) {
