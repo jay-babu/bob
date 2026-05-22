@@ -242,14 +242,14 @@ func (os {{$tAlias.UpSingular}}Slice) LoadCount{{$relAlias}}(ctx context.Context
 		),
 		{{if eq (len $rel.Sides) 1 -}}
 		// Single-hop: FROM related table directly
-		sm.From({{$.TableVar $rel.Foreign}}.NameAs()),
+		sm.From({{$.TableVar $rel.Foreign}}.NameAsExpr()),
 		{{range $where := $firstSide.ToWhere -}}
 		{{$whereColAlias := index $firstTo.Columns $where.Column -}}
 		sm.Where({{$.TableVar $firstSide.To}}.Columns.{{$whereColAlias}}.EQ({{$.Dialect}}.Arg({{quote $where.SQLValue}}))),
 		{{end -}}
 		{{- else -}}
 		// Multi-hop: FROM first join table, JOIN through to final related table
-		sm.From({{$.TableVar $firstSide.To}}.NameAs()),
+		sm.From({{$.TableVar $firstSide.To}}.NameAsExpr()),
 		{{range $where := $firstSide.ToWhere -}}
 		{{$whereColAlias := index $firstTo.Columns $where.Column -}}
 		sm.Where({{$.TableVar $firstSide.To}}.Columns.{{$whereColAlias}}.EQ({{$.Dialect}}.Arg({{quote $where.SQLValue}}))),
@@ -258,7 +258,7 @@ func (os {{$tAlias.UpSingular}}Slice) LoadCount{{$relAlias}}(ctx context.Context
 		{{if eq $sideIndex 0 -}}{{continue}}{{end -}}
 		{{$sideFrom := $.Aliases.Table $side.From -}}
 		{{$sideTo := $.Aliases.Table $side.To -}}
-		sm.InnerJoin({{$.TableVar $side.To}}.NameAs()).On(
+		sm.InnerJoin({{$.TableVar $side.To}}.NameAsExpr()).On(
 			{{range $i, $fromColKey := $side.FromColumns -}}
 			{{$toColKey := index $side.ToColumns $i -}}
 			{{$sideToColAlias := index $sideTo.Columns $toColKey -}}
