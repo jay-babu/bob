@@ -45,7 +45,7 @@
               {{if ne $index (sub (len $rel.Sides) 1) -}}
               to := {{$toCols}}.AliasedAs({{$toCols}}.Alias() + uniqueSuffix)
               {{end -}}
-              mods = append(mods, dialect.Join[Q](typ, {{$.TableVar $side.To}}.Name().As(to.Alias())).On(
+              mods = append(mods, dialect.Join[Q](typ, {{$.TableVar $side.To}}.NameExpr().As(to.Alias())).On(
                   {{range $i, $local := $side.FromColumns -}}
                     {{- $fromCol := index $from.Columns $local -}}
                     {{- $toCol := index $to.Columns (index $side.ToColumns $i) -}}
