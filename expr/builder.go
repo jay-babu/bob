@@ -26,7 +26,6 @@ func X[T bob.Expression, B builder[T]](exp bob.Expression, others ...bob.Express
 		return t
 	case bob.ParensOmitter:
 		if t.ShouldOmitParens() {
-			// Expression handles its own wrapping rules.
 			break
 		}
 
