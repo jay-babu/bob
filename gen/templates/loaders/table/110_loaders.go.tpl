@@ -334,6 +334,7 @@ func (os {{$tAlias.UpSingular}}Slice) Load{{$relAlias}}(ctx context.Context, exe
 
         {{- $fromColGet := (cat "o." ($fromAlias.Column $local)) -}}
         {{- $toColGet := (cat "rel." ($toAlias.Column $foreign)) -}}
+        {{- $toColGet = $.Types.TypeCastExpr $.CurrentPackage $.Importer $fromCol.Type $toCol.Type $toColGet -}}
         {{- with $.Types.GetCompareExpr $.CurrentPackage $.Importer $fromCol.Type $fromCol.Nullable $toCol.Nullable -}}
           if !({{replace "AAA" $fromColGet . | replace "BBB" $toColGet}}) {
             continue
