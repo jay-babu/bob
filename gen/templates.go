@@ -150,6 +150,35 @@ func (d *TemplateData[T, C, I]) splitRef(tableKey, name string) string {
 	return path.Base(component.PackagePath) + "." + name
 }
 
+func (d *TemplateData[T, C, I]) HasExpandThenLoader(tableKey string) bool {
+	return len(d.Relationships.Get(tableKey)) > 0
+}
+
+func (d *TemplateData[T, C, I]) SameModelSplitComponent(tableKey string) bool {
+	if d.ModelSplit == nil || !d.ModelSplit.Enabled || d.ModelSplit.Generation != modelSplitGenerationComponent || d.ModelSplit.CurrentComponent == nil {
+		return true
+	}
+
+	component := d.ModelSplit.TableComponents[tableKey]
+	return component == nil || component.ID == d.ModelSplit.CurrentComponent.ID
+}
+
+func (d *TemplateData[T, C, I]) SelectThenLoadVar(tableKey string) string {
+	return d.splitRef(tableKey, "SelectThenLoad")
+}
+
+func (d *TemplateData[T, C, I]) ExpandLoadOptionType(tableKey string) string {
+	return d.splitRef(tableKey, "ExpandLoadOption")
+}
+
+func (d *TemplateData[T, C, I]) WithMaxExpandDepthFunc(tableKey string) string {
+	return d.splitRef(tableKey, "WithMaxExpandDepth")
+}
+
+func (d *TemplateData[T, C, I]) WithComputedTerminalFunc(tableKey string) string {
+	return d.splitRef(tableKey, "WithComputedTerminal")
+}
+
 func (d *TemplateData[T, C, I]) TableAlias(tableKey string) drivers.TableAlias {
 	return d.Aliases.Table(tableKey)
 }

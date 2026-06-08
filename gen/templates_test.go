@@ -180,7 +180,7 @@ func TestLoadersTemplateGeneratesExpandDrivenThenLoadMethods(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rel := orm.Relationship{
+	videoRel := orm.Relationship{
 		Name: "user_videos",
 		Sides: []orm.RelSide{{
 			From:        "users",
@@ -190,17 +190,39 @@ func TestLoadersTemplateGeneratesExpandDrivenThenLoadMethods(t *testing.T) {
 			Modify:      "to",
 		}},
 	}
+	profileRel := orm.Relationship{
+		Name: "user_profile",
+		Sides: []orm.RelSide{{
+			From:        "users",
+			To:          "profiles",
+			FromColumns: []string{"profile_id"},
+			ToColumns:   []string{"id"},
+			Modify:      "from",
+		}},
+	}
+	commentRel := orm.Relationship{
+		Name: "video_comments",
+		Sides: []orm.RelSide{{
+			From:        "videos",
+			To:          "comments",
+			FromColumns: []string{"id"},
+			ToColumns:   []string{"video_id"},
+			Modify:      "to",
+		}},
+	}
 
 	data := TemplateData[any, any, any]{
 		Dialect:  "psql",
 		Importer: testImporter{},
 		Table: drivers.Table[any, any]{
 			Key:     "users",
-			Columns: []drivers.Column{{Name: "id"}},
+			Columns: []drivers.Column{{Name: "id"}, {Name: "profile_id"}},
 		},
 		AllTables: drivers.Tables[any, any]{
-			{Key: "users", Columns: []drivers.Column{{Name: "id"}}},
+			{Key: "users", Columns: []drivers.Column{{Name: "id"}, {Name: "profile_id"}}},
 			{Key: "videos", Columns: []drivers.Column{{Name: "id"}, {Name: "user_id"}}},
+			{Key: "comments", Columns: []drivers.Column{{Name: "id"}, {Name: "video_id"}}},
+			{Key: "profiles", Columns: []drivers.Column{{Name: "id"}}},
 		},
 		Aliases: drivers.Aliases{
 			"users": {
@@ -208,10 +230,12 @@ func TestLoadersTemplateGeneratesExpandDrivenThenLoadMethods(t *testing.T) {
 				UpSingular:   "User",
 				DownSingular: "user",
 				Columns: map[string]string{
-					"id": "ID",
+					"id":         "ID",
+					"profile_id": "ProfileID",
 				},
 				Relationships: map[string]string{
-					"user_videos": "Videos",
+					"user_videos":  "Videos",
+					"user_profile": "Profile",
 				},
 			},
 			"videos": {
@@ -223,10 +247,36 @@ func TestLoadersTemplateGeneratesExpandDrivenThenLoadMethods(t *testing.T) {
 					"id":      "ID",
 					"user_id": "UserID",
 				},
+				Relationships: map[string]string{
+					"video_comments": "Comments",
+				},
+			},
+			"comments": {
+				UpPlural:     "Comments",
+				UpSingular:   "Comment",
+				DownPlural:   "comments",
+				DownSingular: "comment",
+			},
+			"profiles": {
+				UpPlural:     "Profiles",
+				UpSingular:   "Profile",
+				DownPlural:   "profiles",
+				DownSingular: "profile",
+				Columns: map[string]string{
+					"id": "ID",
+				},
 			},
 		},
 		Relationships: Relationships{
-			"users": {rel},
+			"users":  {profileRel, videoRel},
+			"videos": {commentRel},
+		},
+		ModelSplit: &ModelSplitData{
+			Enabled:          true,
+			Generation:       modelSplitGenerationComponent,
+			Components:       []*ModelSplitComponent{{ID: "users", Package: "cusers", PackagePath: "example.com/models/internal/components/cusers", TableKeys: []string{"users"}}, {ID: "videos", Package: "cvideos", PackagePath: "example.com/models/internal/components/cvideos", TableKeys: []string{"videos"}}},
+			TableComponents:  map[string]*ModelSplitComponent{"users": {ID: "users", Package: "cusers", PackagePath: "example.com/models/internal/components/cusers", TableKeys: []string{"users"}}, "videos": {ID: "videos", Package: "cvideos", PackagePath: "example.com/models/internal/components/cvideos", TableKeys: []string{"videos"}}},
+			CurrentComponent: &ModelSplitComponent{ID: "users", Package: "cusers", PackagePath: "example.com/models/internal/components/cusers", TableKeys: []string{"users"}},
 		},
 	}
 
@@ -239,8 +289,11 @@ func TestLoadersTemplateGeneratesExpandDrivenThenLoadMethods(t *testing.T) {
 	for _, want := range []string{
 		"func (l UserThenLoader[Q]) ForExpandMap(expands map[string]struct{}, opts ...ExpandLoadOption) ([]bob.Mod[Q], error)",
 		"func (l UserThenLoader[Q]) ForExpandPaths(paths []string, opts ...ExpandLoadOption) ([]bob.Mod[Q], error)",
+		"case \"profile\":",
+		"if len(child.children) > 0 {",
+		"mods = append(mods, l.Profile())",
 		"case \"videos\":",
-		"childMods, err := SelectThenLoad.Video.forExpandTree(child, depth+1, opts)",
+		"childMods, err := cvideos.SelectThenLoad.Video.ForExpandPaths(child.paths(), childOptions...)",
 		"mods = append(mods, l.Videos(childMods...))",
 	} {
 		if !strings.Contains(got, want) {
