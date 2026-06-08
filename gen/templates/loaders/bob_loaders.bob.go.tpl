@@ -164,28 +164,6 @@ func (tree expandTree) sortedSegments() []string {
 	return segments
 }
 
-func (tree expandTree) paths() []string {
-	if len(tree.children) == 0 {
-		return nil
-	}
-
-	paths := make([]string, 0, len(tree.children))
-	for _, segment := range tree.sortedSegments() {
-		child := tree.children[segment]
-		childPaths := child.paths()
-		if len(childPaths) == 0 {
-			paths = append(paths, segment)
-			continue
-		}
-
-		for _, childPath := range childPaths {
-			paths = append(paths, segment+"."+childPath)
-		}
-	}
-
-	return paths
-}
-
 func (tree expandTree) computedTerminal(options expandLoadOptions) bool {
 	return len(tree.children) == 0 && options.computedTerminal != nil && options.computedTerminal(tree.path)
 }

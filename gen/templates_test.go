@@ -293,11 +293,20 @@ func TestLoadersTemplateGeneratesExpandDrivenThenLoadMethods(t *testing.T) {
 		"if len(child.children) > 0 {",
 		"mods = append(mods, l.Profile())",
 		"case \"videos\":",
-		"childMods, err := cvideos.SelectThenLoad.Video.ForExpandPaths(child.paths(), childOptions...)",
-		"mods = append(mods, l.Videos(childMods...))",
+		"expand path %q cannot be nested because Video is generated in another model component",
+		"mods = append(mods, l.Videos())",
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected generated loaders to contain %q, got:\n%s", want, got)
+		}
+	}
+
+	for _, unwanted := range []string{
+		"cvideos.SelectThenLoad",
+		"example.com/models/internal/components/cvideos",
+	} {
+		if strings.Contains(got, unwanted) {
+			t.Fatalf("expected generated loaders not to contain cross-component reference %q, got:\n%s", unwanted, got)
 		}
 	}
 }
