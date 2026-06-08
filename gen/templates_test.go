@@ -166,20 +166,7 @@ func TestSliceMutationMethodsTemplateCanBeDisabled(t *testing.T) {
 	}
 }
 
-func TestLoadersTemplateGeneratesExpandDrivenThenLoadMethods(t *testing.T) {
-	content, err := fs.ReadFile(templates, "templates/loaders/table/110_loaders.go.tpl")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tpl, err := template.New("loaders").
-		Funcs(sprig.GenericFuncMap()).
-		Funcs(templateFunctions).
-		Parse(string(content))
-	if err != nil {
-		t.Fatal(err)
-	}
-
+func expandDrivenThenLoadTemplateData() TemplateData[any, any, any] {
 	videoRel := orm.Relationship{
 		Name: "user_videos",
 		Sides: []orm.RelSide{{
@@ -211,16 +198,22 @@ func TestLoadersTemplateGeneratesExpandDrivenThenLoadMethods(t *testing.T) {
 		}},
 	}
 
-	data := TemplateData[any, any, any]{
+	return TemplateData[any, any, any]{
 		Dialect:  "psql",
 		Importer: testImporter{},
 		Table: drivers.Table[any, any]{
 			Key:     "users",
 			Columns: []drivers.Column{{Name: "id"}, {Name: "profile_id"}},
 		},
-		AllTables: drivers.Tables[any, any]{
+		Tables: drivers.Tables[any, any]{
 			{Key: "users", Columns: []drivers.Column{{Name: "id"}, {Name: "profile_id"}}},
 			{Key: "videos", Columns: []drivers.Column{{Name: "id"}, {Name: "user_id"}}},
+			{Key: "comments", Columns: []drivers.Column{{Name: "id"}, {Name: "video_id"}}},
+			{Key: "profiles", Columns: []drivers.Column{{Name: "id"}}},
+		},
+		AllTables: drivers.Tables[any, any]{
+			{Key: "users", Columns: []drivers.Column{{Name: "id"}, {Name: "profile_id"}}},
+			{Key: "videos", Columns: []drivers.Column{{Name: "id", Generated: true}, {Name: "user_id"}}},
 			{Key: "comments", Columns: []drivers.Column{{Name: "id"}, {Name: "video_id"}}},
 			{Key: "profiles", Columns: []drivers.Column{{Name: "id"}}},
 		},
@@ -279,6 +272,62 @@ func TestLoadersTemplateGeneratesExpandDrivenThenLoadMethods(t *testing.T) {
 			CurrentComponent: &ModelSplitComponent{ID: "users", Package: "cusers", PackagePath: "example.com/models/internal/components/cusers", TableKeys: []string{"users"}},
 		},
 	}
+}
+
+func TestLoadersTemplateGeneratesFacadeExpandThenLoadMethods(t *testing.T) {
+	content, err := fs.ReadFile(templates, "templates/loaders/bob_loaders.bob.go.tpl")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tpl, err := template.New("loaders").
+		Funcs(sprig.GenericFuncMap()).
+		Funcs(templateFunctions).
+		Parse(string(content))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	data := expandDrivenThenLoadTemplateData()
+	data.ModelSplit.Generation = modelSplitGenerationFacade
+	data.ModelSplit.CurrentComponent = nil
+
+	var out bytes.Buffer
+	if err := tpl.Execute(&out, &data); err != nil {
+		t.Fatal(err)
+	}
+
+	got := out.String()
+	for _, want := range []string{
+		"User expandUserThenLoader[Q]",
+		"type expandUserThenLoader[Q orm.Loadable] struct {",
+		"cusers.UserThenLoader[Q]",
+		"func (l expandUserThenLoader[Q]) ForExpandMap(expands map[string]struct{}, opts ...ExpandLoadOption) ([]bob.Mod[Q], error)",
+		"case \"videos\":",
+		"childMods, err := SelectThenLoad.Video.forExpandTree(child, depth+1, opts)",
+		"mods = append(mods, l.Videos(childMods...))",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected generated facade loaders to contain %q, got:\n%s", want, got)
+		}
+	}
+}
+
+func TestLoadersTemplateGeneratesExpandDrivenThenLoadMethods(t *testing.T) {
+	content, err := fs.ReadFile(templates, "templates/loaders/table/110_loaders.go.tpl")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tpl, err := template.New("loaders").
+		Funcs(sprig.GenericFuncMap()).
+		Funcs(templateFunctions).
+		Parse(string(content))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	data := expandDrivenThenLoadTemplateData()
 
 	var out bytes.Buffer
 	if err := tpl.Execute(&out, &data); err != nil {

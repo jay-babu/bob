@@ -37,7 +37,11 @@ var (
 type thenLoaders[Q orm.Loadable] struct {
 		{{range $table := .Tables -}}{{if $.Relationships.Get $table.Key -}}
 		{{$tAlias := $.Aliases.Table $table.Key -}}
+		{{if $.IsModelSplitFacade -}}
+		{{$tAlias.UpSingular}} expand{{$tAlias.UpSingular}}ThenLoader[Q]
+		{{else -}}
 		{{$tAlias.UpSingular}} {{$.ThenLoaderType $table.Key}}[Q]
+		{{end -}}
 		{{end}}{{end}}
 }
 
@@ -45,11 +49,81 @@ func getThenLoaders[Q orm.Loadable]() thenLoaders[Q] {
 	return thenLoaders[Q]{
 		{{range $table := .Tables -}}{{if $.Relationships.Get $table.Key -}}
 		{{$tAlias := $.Aliases.Table $table.Key -}}
+		{{if $.IsModelSplitFacade -}}
+		{{$tAlias.UpSingular}}: expand{{$tAlias.UpSingular}}ThenLoader[Q]{ {{$.BuildThenLoaderFunc $table.Key}}[Q]() },
+		{{else -}}
 		{{$tAlias.UpSingular}}: {{$.BuildThenLoaderFunc $table.Key}}[Q](),
+		{{end -}}
 		{{end}}{{end}}
 	}
 }
 
+{{if $.IsModelSplitFacade -}}
+{{range $table := .Tables -}}{{if $.Relationships.Get $table.Key -}}
+{{$tAlias := $.Aliases.Table $table.Key -}}
+type expand{{$tAlias.UpSingular}}ThenLoader[Q orm.Loadable] struct {
+	{{$.ThenLoaderType $table.Key}}[Q]
+}
+
+func (l expand{{$tAlias.UpSingular}}ThenLoader[Q]) ForExpandMap(expands map[string]struct{}, opts ...ExpandLoadOption) ([]bob.Mod[Q], error) {
+	paths := make([]string, 0, len(expands))
+	for path := range expands {
+		paths = append(paths, path)
+	}
+
+	return l.ForExpandPaths(paths, opts...)
+}
+
+func (l expand{{$tAlias.UpSingular}}ThenLoader[Q]) ForExpandPaths(paths []string, opts ...ExpandLoadOption) ([]bob.Mod[Q], error) {
+	options := newExpandLoadOptions(opts...)
+	tree, err := buildExpandTree(paths, options.maxDepth)
+	if err != nil {
+		return nil, err
+	}
+
+	return l.forExpandTree(tree, 0, options)
+}
+
+func (l expand{{$tAlias.UpSingular}}ThenLoader[Q]) forExpandTree(tree expandTree, depth int, opts expandLoadOptions) ([]bob.Mod[Q], error) {
+	if opts.maxDepth >= 0 && depth > opts.maxDepth {
+		return nil, fmt.Errorf("expand path %q exceeds max depth %d", tree.path, opts.maxDepth)
+	}
+
+	mods := make([]bob.Mod[Q], 0, len(tree.children))
+	for _, segment := range tree.sortedSegments() {
+		child := *tree.children[segment]
+		if child.computedTerminal(opts) {
+			continue
+		}
+
+		switch segment {
+		{{range $rel := $.Relationships.Get $table.Key -}}
+		{{- $relAlias := $tAlias.Relationship $rel.Name -}}
+		{{- $fAlias := $.Aliases.Table $rel.Foreign -}}
+		case {{snakecase $relAlias | quote}}:
+			{{if $.HasExpandThenLoader $rel.Foreign -}}
+			childMods, err := SelectThenLoad.{{$fAlias.UpSingular}}.forExpandTree(child, depth+1, opts)
+			if err != nil {
+				return nil, err
+			}
+			mods = append(mods, l.{{$relAlias}}(childMods...))
+			{{else -}}
+			if len(child.children) > 0 {
+				return nil, fmt.Errorf("expand path %q cannot be nested because {{$fAlias.UpSingular}} has no generated expand relationships", child.path)
+			}
+			mods = append(mods, l.{{$relAlias}}())
+			{{end -}}
+		{{end -}}
+		default:
+			return nil, fmt.Errorf("expand segment %q does not match a relationship on {{$tAlias.UpSingular}}", segment)
+		}
+	}
+
+	return mods, nil
+}
+
+{{end}}{{end -}}
+{{end -}}
 
 func thenLoadBuilder[Q orm.Loadable, T any](name string, f func(context.Context, bob.Executor, T, ...bob.Mod[*dialect.SelectQuery]) error) func(...bob.Mod[*dialect.SelectQuery]) orm.Loader[Q] {
 	return func(queryMods ...bob.Mod[*dialect.SelectQuery]) orm.Loader[Q] {

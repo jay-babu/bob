@@ -150,6 +150,10 @@ func (d *TemplateData[T, C, I]) splitRef(tableKey, name string) string {
 	return path.Base(component.PackagePath) + "." + name
 }
 
+func (d *TemplateData[T, C, I]) IsModelSplitFacade() bool {
+	return d.ModelSplit != nil && d.ModelSplit.Enabled && d.ModelSplit.Generation == modelSplitGenerationFacade
+}
+
 func (d *TemplateData[T, C, I]) HasExpandThenLoader(tableKey string) bool {
 	return len(d.Relationships.Get(tableKey)) > 0
 }
