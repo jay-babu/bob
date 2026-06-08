@@ -9,6 +9,7 @@ import (
 
 	"github.com/Masterminds/sprig/v3"
 	"github.com/stephenafamo/bob/gen/drivers"
+	"github.com/stephenafamo/bob/orm"
 )
 
 type testImporter map[string]struct{}
@@ -161,6 +162,89 @@ func TestSliceMutationMethodsTemplateCanBeDisabled(t *testing.T) {
 	for _, removed := range []string{"UpdateAll", "DeleteAll", "ReloadAll", "UpdateMod", "DeleteMod", "pkIN", "copyMatchingRows"} {
 		if strings.Contains(got, removed) {
 			t.Fatalf("expected %s to be omitted, got:\n%s", removed, got)
+		}
+	}
+}
+
+func TestLoadersTemplateGeneratesExpandDrivenThenLoadMethods(t *testing.T) {
+	content, err := fs.ReadFile(templates, "templates/loaders/table/110_loaders.go.tpl")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tpl, err := template.New("loaders").
+		Funcs(sprig.GenericFuncMap()).
+		Funcs(templateFunctions).
+		Parse(string(content))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rel := orm.Relationship{
+		Name: "user_videos",
+		Sides: []orm.RelSide{{
+			From:        "users",
+			To:          "videos",
+			FromColumns: []string{"id"},
+			ToColumns:   []string{"user_id"},
+			Modify:      "to",
+		}},
+	}
+
+	data := TemplateData[any, any, any]{
+		Dialect:  "psql",
+		Importer: testImporter{},
+		Table: drivers.Table[any, any]{
+			Key:     "users",
+			Columns: []drivers.Column{{Name: "id"}},
+		},
+		AllTables: drivers.Tables[any, any]{
+			{Key: "users", Columns: []drivers.Column{{Name: "id"}}},
+			{Key: "videos", Columns: []drivers.Column{{Name: "id"}, {Name: "user_id"}}},
+		},
+		Aliases: drivers.Aliases{
+			"users": {
+				UpPlural:     "Users",
+				UpSingular:   "User",
+				DownSingular: "user",
+				Columns: map[string]string{
+					"id": "ID",
+				},
+				Relationships: map[string]string{
+					"user_videos": "Videos",
+				},
+			},
+			"videos": {
+				UpPlural:     "Videos",
+				UpSingular:   "Video",
+				DownPlural:   "videos",
+				DownSingular: "video",
+				Columns: map[string]string{
+					"id":      "ID",
+					"user_id": "UserID",
+				},
+			},
+		},
+		Relationships: Relationships{
+			"users": {rel},
+		},
+	}
+
+	var out bytes.Buffer
+	if err := tpl.Execute(&out, &data); err != nil {
+		t.Fatal(err)
+	}
+
+	got := out.String()
+	for _, want := range []string{
+		"func (l UserThenLoader[Q]) ForExpandMap(expands map[string]struct{}, opts ...ExpandLoadOption) ([]bob.Mod[Q], error)",
+		"func (l UserThenLoader[Q]) ForExpandPaths(paths []string, opts ...ExpandLoadOption) ([]bob.Mod[Q], error)",
+		"case \"videos\":",
+		"childMods, err := SelectThenLoad.Video.forExpandTree(child, depth+1, opts)",
+		"mods = append(mods, l.Videos(childMods...))",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected generated loaders to contain %q, got:\n%s", want, got)
 		}
 	}
 }

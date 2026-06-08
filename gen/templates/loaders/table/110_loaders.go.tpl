@@ -170,7 +170,55 @@ func Build{{$tAlias.UpSingular}}ThenLoader[Q orm.Loadable]() {{$tAlias.UpSingula
   }
 }
 
+func (l {{$tAlias.UpSingular}}ThenLoader[Q]) ForExpandMap(expands map[string]struct{}, opts ...ExpandLoadOption) ([]bob.Mod[Q], error) {
+	paths := make([]string, 0, len(expands))
+	for path := range expands {
+		paths = append(paths, path)
+	}
 
+	return l.ForExpandPaths(paths, opts...)
+}
+
+func (l {{$tAlias.UpSingular}}ThenLoader[Q]) ForExpandPaths(paths []string, opts ...ExpandLoadOption) ([]bob.Mod[Q], error) {
+	options := newExpandLoadOptions(opts...)
+	tree, err := buildExpandTree(paths, options.maxDepth)
+	if err != nil {
+		return nil, err
+	}
+
+	return l.forExpandTree(tree, 0, options)
+}
+
+func (l {{$tAlias.UpSingular}}ThenLoader[Q]) forExpandTree(tree expandTree, depth int, opts expandLoadOptions) ([]bob.Mod[Q], error) {
+	if opts.maxDepth >= 0 && depth > opts.maxDepth {
+		return nil, fmt.Errorf("expand path %q exceeds max depth %d", tree.path, opts.maxDepth)
+	}
+
+	mods := make([]bob.Mod[Q], 0, len(tree.children))
+	for _, segment := range tree.sortedSegments() {
+		child := *tree.children[segment]
+		if child.computedTerminal(opts) {
+			continue
+		}
+
+		switch segment {
+		{{range $rel := $.Relationships.Get $table.Key -}}
+		{{- $relAlias := $tAlias.Relationship $rel.Name -}}
+		{{- $fAlias := $.Aliases.Table $rel.Foreign -}}
+		case {{snakecase $relAlias | quote}}:
+			childMods, err := SelectThenLoad.{{$fAlias.UpSingular}}.forExpandTree(child, depth+1, opts)
+			if err != nil {
+				return nil, err
+			}
+			mods = append(mods, l.{{$relAlias}}(childMods...))
+		{{end -}}
+		default:
+			return nil, fmt.Errorf("expand segment %q does not match a relationship on {{$tAlias.UpSingular}}", segment)
+		}
+	}
+
+	return mods, nil
+}
 
 {{range $rel := $.Relationships.Get $table.Key -}}
 {{- $isToView := $.AllTables.RelIsView $rel -}}
