@@ -313,6 +313,44 @@ func TestLoadersTemplateGeneratesFacadeExpandThenLoadMethods(t *testing.T) {
 	}
 }
 
+func TestLoadersTemplateGeneratesFacadeExpandPreloadMethods(t *testing.T) {
+	content, err := fs.ReadFile(templates, "templates/loaders/bob_loaders.bob.go.tpl")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tpl, err := template.New("loaders").
+		Funcs(sprig.GenericFuncMap()).
+		Funcs(templateFunctions).
+		Parse(string(content))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	data := expandDrivenThenLoadTemplateData()
+	data.ModelSplit.Generation = modelSplitGenerationFacade
+	data.ModelSplit.CurrentComponent = nil
+
+	var out bytes.Buffer
+	if err := tpl.Execute(&out, &data); err != nil {
+		t.Fatal(err)
+	}
+
+	got := out.String()
+	for _, want := range []string{
+		"User expandUserPreloader",
+		"type expandUserPreloader struct {",
+		"cusers.UserPreloader",
+		"func (l expandUserPreloader) ForExpandMap(expands map[string]struct{}, opts ...ExpandLoadOption) ([]bob.Mod[*dialect.SelectQuery], error)",
+		"case \"profile\":",
+		"mods = append(mods, l.Profile(append(childOpts, psql.PreloadAs(\"profile\"))...))",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected generated facade preloaders to contain %q, got:\n%s", want, got)
+		}
+	}
+}
+
 func TestLoadersTemplateGeneratesExpandDrivenThenLoadMethods(t *testing.T) {
 	content, err := fs.ReadFile(templates, "templates/loaders/table/110_loaders.go.tpl")
 	if err != nil {
@@ -356,6 +394,49 @@ func TestLoadersTemplateGeneratesExpandDrivenThenLoadMethods(t *testing.T) {
 	} {
 		if strings.Contains(got, unwanted) {
 			t.Fatalf("expected generated loaders not to contain cross-component reference %q, got:\n%s", unwanted, got)
+		}
+	}
+}
+
+func TestLoadersTemplateGeneratesExpandDrivenPreloadMethods(t *testing.T) {
+	content, err := fs.ReadFile(templates, "templates/loaders/table/110_loaders.go.tpl")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tpl, err := template.New("loaders").
+		Funcs(sprig.GenericFuncMap()).
+		Funcs(templateFunctions).
+		Parse(string(content))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	data := expandDrivenThenLoadTemplateData()
+
+	var out bytes.Buffer
+	if err := tpl.Execute(&out, &data); err != nil {
+		t.Fatal(err)
+	}
+
+	got := out.String()
+	for _, want := range []string{
+		"func (l UserPreloader) ForExpandMap(expands map[string]struct{}, opts ...ExpandLoadOption) ([]bob.Mod[*dialect.SelectQuery], error)",
+		"func (l UserPreloader) ForExpandPaths(paths []string, opts ...ExpandLoadOption) ([]bob.Mod[*dialect.SelectQuery], error)",
+		"case \"profile\":",
+		"mods = append(mods, l.Profile(append(childOpts, psql.PreloadAs(\"profile\"))...))",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected generated preloaders to contain %q, got:\n%s", want, got)
+		}
+	}
+
+	for _, unwanted := range []string{
+		"cvideos.Preload",
+		"example.com/models/internal/components/cvideos",
+	} {
+		if strings.Contains(got, unwanted) {
+			t.Fatalf("expected generated preloaders not to contain cross-component reference %q, got:\n%s", unwanted, got)
 		}
 	}
 }

@@ -158,6 +158,16 @@ func (d *TemplateData[T, C, I]) HasExpandThenLoader(tableKey string) bool {
 	return len(d.Relationships.Get(tableKey)) > 0
 }
 
+func (d *TemplateData[T, C, I]) HasExpandPreloader(tableKey string) bool {
+	for _, rel := range d.Relationships.Get(tableKey) {
+		if !rel.IsToMany() {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (d *TemplateData[T, C, I]) SameModelSplitComponent(tableKey string) bool {
 	if d.ModelSplit == nil || !d.ModelSplit.Enabled || d.ModelSplit.Generation != modelSplitGenerationComponent || d.ModelSplit.CurrentComponent == nil {
 		return true

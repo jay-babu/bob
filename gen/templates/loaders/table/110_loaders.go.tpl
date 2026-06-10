@@ -140,6 +140,83 @@ func Build{{$tAlias.UpSingular}}Preloader() {{$tAlias.UpSingular}}Preloader {
   }
 }
 
+func (l {{$tAlias.UpSingular}}Preloader) ForExpandMap(expands map[string]struct{}, opts ...ExpandLoadOption) ([]bob.Mod[*dialect.SelectQuery], error) {
+	paths := make([]string, 0, len(expands))
+	for path := range expands {
+		paths = append(paths, path)
+	}
+
+	return l.ForExpandPaths(paths, opts...)
+}
+
+func (l {{$tAlias.UpSingular}}Preloader) ForExpandPaths(paths []string, opts ...ExpandLoadOption) ([]bob.Mod[*dialect.SelectQuery], error) {
+	options := newExpandLoadOptions(opts...)
+	tree, err := buildExpandTree(paths, options.maxDepth)
+	if err != nil {
+		return nil, err
+	}
+
+	preloadOpts, err := l.forExpandTree(tree, 0, options)
+	if err != nil {
+		return nil, err
+	}
+
+	mods := make([]bob.Mod[*dialect.SelectQuery], 0, len(preloadOpts))
+	for _, opt := range preloadOpts {
+		mod, ok := opt.(bob.Mod[*dialect.SelectQuery])
+		if !ok {
+			return nil, fmt.Errorf("expand preload option %T is not a select query mod", opt)
+		}
+		mods = append(mods, mod)
+	}
+
+	return mods, nil
+}
+
+func (l {{$tAlias.UpSingular}}Preloader) forExpandTree(tree expandTree, depth int, opts expandLoadOptions) ([]{{$.Dialect}}.PreloadOption, error) {
+	if opts.maxDepth >= 0 && depth > opts.maxDepth {
+		return nil, fmt.Errorf("expand path %q exceeds max depth %d", tree.path, opts.maxDepth)
+	}
+
+	mods := make([]{{$.Dialect}}.PreloadOption, 0, len(tree.children))
+	for _, segment := range tree.sortedSegments() {
+		child := *tree.children[segment]
+		if child.computedTerminal(opts) {
+			continue
+		}
+
+		switch segment {
+		{{range $rel := $.Relationships.Get $table.Key -}}
+		{{- if $rel.IsToMany -}}{{continue}}{{- end -}}
+		{{- $relAlias := $tAlias.Relationship $rel.Name -}}
+		{{- $fAlias := $.Aliases.Table $rel.Foreign -}}
+		case {{snakecase $relAlias | quote}}:
+			var childOpts []{{$.Dialect}}.PreloadOption
+			{{if and ($.HasExpandPreloader $rel.Foreign) ($.SameModelSplitComponent $rel.Foreign) -}}
+			var err error
+			childOpts, err = Preload.{{$fAlias.UpSingular}}.forExpandTree(child, depth+1, opts)
+			if err != nil {
+				return nil, err
+			}
+			{{else -}}
+			if len(child.children) > 0 {
+				{{if $.HasExpandPreloader $rel.Foreign -}}
+				return nil, fmt.Errorf("expand path %q cannot be nested because {{$fAlias.UpSingular}} is generated in another model component", child.path)
+				{{else -}}
+				return nil, fmt.Errorf("expand path %q cannot be nested because {{$fAlias.UpSingular}} has no generated preload relationships", child.path)
+				{{end -}}
+			}
+			{{end -}}
+			mods = append(mods, l.{{$relAlias}}(append(childOpts, {{$.Dialect}}.PreloadAs({{snakecase $relAlias | quote}}))...))
+		{{end -}}
+		default:
+			return nil, fmt.Errorf("expand segment %q does not match a relationship on {{$tAlias.UpSingular}}", segment)
+		}
+	}
+
+	return mods, nil
+}
+
 
 type {{$tAlias.UpSingular}}ThenLoader[Q orm.Loadable] struct {
   {{range $rel := $.Relationships.Get $table.Key -}}
