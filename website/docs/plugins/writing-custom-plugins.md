@@ -134,6 +134,36 @@ Plugins are executed in the order they are passed. If your custom plugin depends
 
 :::
 
+### Marking Columns as Read-Only
+
+If a column should be selectable but should not be emitted in generated mutation setters, add the built-in `ReadOnlyColumns` plugin to your custom generator. This marks the configured columns as generated before templates run. Generated columns are still included in model structs and column expressions, but are omitted from setters, insert values, and update expressions.
+
+```go
+builtinPlugins := plugins.Setup[any, any, driver.IndexExtra](
+    pluginsConfig,
+    gen.PSQLTemplates,
+)
+
+allPlugins := append(builtinPlugins,
+    plugins.ReadOnlyColumns[any, any, driver.IndexExtra]("changed_reason"),
+)
+
+state := &gen.State[any]{Config: config}
+return gen.Run(c.Context, state, driver.New(driverConfig), allPlugins...)
+```
+
+Use `ReadOnlyColumnsWithConfig` when only some tables should treat a column as read-only:
+
+```go
+allPlugins := append(builtinPlugins,
+    plugins.ReadOnlyColumnsWithConfig[any, any, driver.IndexExtra](plugins.ReadOnlyColumnsConfig{
+        Tables: map[string][]string{
+            "public.users": {"changed_reason"},
+        },
+    }),
+)
+```
+
 ## Examples
 
 ### Adding a New Output
