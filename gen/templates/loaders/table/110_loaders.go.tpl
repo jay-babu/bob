@@ -138,7 +138,7 @@ func Build{{$tAlias.UpSingular}}Preloader() {{$tAlias.UpSingular}}Preloader {
             },
             {{- end}}
           },
-        }, {{$.TableVar $rel.Foreign}}.Columns.Names(), {{$fAlias.DownSingular}}ScanMapperNullable, opts...)
+        }, {{$.TableVar $rel.Foreign}}.Columns.Names(), {{$fAlias.UpSingular}}ScanMapperNullable, opts...)
     },
     {{end -}}
   }

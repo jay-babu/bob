@@ -209,36 +209,6 @@ func TestSelect(t *testing.T) {
 				SELECT id
 				FROM orders USE INDEX (` + "`idx a`" + `, ` + "`idx b`" + `)`,
 		},
-		"optimizer hint with quoted table": {
-			Query: mysql.Select(
-				sm.Columns("id"),
-				sm.From("t"),
-				sm.BKA("my table"),
-			),
-			ExpectedSQL: "SELECT /*+ BKA(`my table`) */ id FROM t",
-		},
-		"from partition with spaced names": {
-			Query: mysql.Select(
-				sm.Columns("id"),
-				sm.From("orders").Partition("p 2024", "p 2025"),
-			),
-			ExpectedSQL: "SELECT id FROM orders PARTITION (`p 2024`, `p 2025`)",
-		},
-		"join partition with spaced name": {
-			Query: mysql.Select(
-				sm.Columns("id"),
-				sm.From("orders"),
-				sm.InnerJoin("line_items").Partition("p 2024"),
-			),
-			ExpectedSQL: "SELECT id FROM orders INNER JOIN line_items PARTITION (`p 2024`)",
-		},
-		"use index with spaced names": {
-			Query: mysql.Select(
-				sm.Columns("id"),
-				sm.From("orders").UseIndex("idx a", "idx b"),
-			),
-			ExpectedSQL: "SELECT id FROM orders USE INDEX (`idx a`, `idx b`)",
-		},
 	}
 
 	testutils.RunTests(t, examples, formatter)

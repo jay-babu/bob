@@ -2,6 +2,7 @@ package vm
 
 import (
 	"github.com/stephenafamo/bob"
+	"github.com/stephenafamo/bob/clause"
 	"github.com/stephenafamo/bob/dialect/psql/dialect"
 	"github.com/stephenafamo/bob/mods"
 )
@@ -11,9 +12,11 @@ func RowValue(clauses ...bob.Expression) bob.Mod[*dialect.ValuesQuery] {
 }
 
 func OrderBy(e any) dialect.OrderBy[*dialect.ValuesQuery] {
-	return dialect.OrderBy[*dialect.ValuesQuery]{
-		Expression: e,
-	}
+	return dialect.OrderBy[*dialect.ValuesQuery](func() clause.OrderDef {
+		return clause.OrderDef{
+			Expression: e,
+		}
+	})
 }
 
 func Limit(count any) bob.Mod[*dialect.ValuesQuery] {

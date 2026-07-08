@@ -253,24 +253,6 @@ func (w *walker) getMergeSource(stmt *pg.MergeStmt, info nodeInfo, sources ...qu
 	)
 }
 
-func (w *walker) getMergeSource(stmt *pg.MergeStmt, info nodeInfo, sources ...queryResult) queryResult {
-	sources = w.addSourcesOfWithClause(stmt.WithClause, info.children["WithClause"], sources...)
-
-	table := w.getTableSource(stmt.Relation, info.children["Relation"])
-	sources = append(sources, table)
-
-	if stmt.SourceRelation != nil {
-		usingSource := w.getSource(stmt.SourceRelation, info.children["SourceRelation"], sources...)
-		sources = append(sources, usingSource)
-	}
-
-	return w.getSourceFromTargets(
-		stmt.ReturningList,
-		info.children["ReturningList"].children,
-		sources...,
-	)
-}
-
 func (w *walker) addSourcesOfWithClause(with *pg.WithClause, info nodeInfo, sources ...queryResult) []queryResult {
 	if with == nil {
 		return sources

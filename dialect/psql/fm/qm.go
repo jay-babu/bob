@@ -14,9 +14,11 @@ func Distinct() bob.Mod[*dialect.Function] {
 }
 
 func OrderBy(e any) dialect.OrderBy[*dialect.Function] {
-	return dialect.OrderBy[*dialect.Function]{
-		Expression: e,
-	}
+	return dialect.OrderBy[*dialect.Function](func() clause.OrderDef {
+		return clause.OrderDef{
+			Expression: e,
+		}
+	})
 }
 
 func WithinGroup() bob.Mod[*dialect.Function] {
