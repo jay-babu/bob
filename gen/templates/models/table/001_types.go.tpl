@@ -159,8 +159,3 @@ func (c {{$tAlias.DownSingular}}Column) AliasedAs(alias string) {{$tAlias.DownSi
 func (c {{$tAlias.DownSingular}}Column) Unqualified() {{$tAlias.DownSingular}}Column {
 	return build{{$tAlias.UpSingular}}Column("", c.name)
 }
-
-// ShouldOmitParens prevents automatic parenthesis wrapping in expression builders.
-func (c {{$tAlias.DownSingular}}Column) ShouldOmitParens() bool {
-	return true
-}

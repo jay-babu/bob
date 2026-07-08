@@ -108,7 +108,7 @@ func TestRequireAll{{$tAlias.UpSingular}}(t *testing.T) {
   }
 
   if len(missingErr.Missing) != len(expectedMissing) {
-    t.Fatalf("Expected %d missing fields, got %d: %v", len(expectedMissing), missingErr.Missing)
+    t.Fatalf("Expected %d missing fields, got %d: %v", len(expectedMissing), len(missingErr.Missing), missingErr.Missing)
   }
 
   for _, field := range missingErr.Missing {

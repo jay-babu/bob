@@ -149,7 +149,7 @@ func (o *{{$tAlias.UpSingular}}Template) Create(ctx context.Context, exec bob.Ex
 	// Parents are keyed by "parent_table:child_table:child_rel_name".
 	mInCreation, _ := modelsInCreationCtx.Value(ctx)
 
-	{{- $hasRequiredRels := false -}}
+	{{ $hasRequiredRels := false -}}
 	{{- range $rel := $.Relationships.Get $table.Key -}}
 		{{- if not ($table.RelIsRequired $rel)}}{{continue}}{{end -}}
 		{{- $hasRequiredRels = true -}}

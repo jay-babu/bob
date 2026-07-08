@@ -2,7 +2,7 @@
 {{- $isFacade := and $isSplit (eq $.ModelSplit.Generation "facade") -}}
 {{- $isComponent := and $isSplit (eq $.ModelSplit.Generation "component") -}}
 {{- if not $isFacade -}}
-{{if not $isComponent}}{{$.Importer.Import "context"}}{{end}}
+{{if not $isComponent}}{{$.Importer.Import "context"}}{{$.Importer.Import "sync"}}{{end}}
 {{$.Importer.Import "fmt"}}
 {{$.Importer.Import "strings"}}
 {{if not $isComponent}}

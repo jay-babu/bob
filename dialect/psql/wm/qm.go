@@ -23,9 +23,11 @@ func PartitionBy(condition any) bob.Mod[*clause.Window] {
 }
 
 func OrderBy(e any) dialect.OrderBy[*clause.Window] {
-	return dialect.OrderBy[*clause.Window]{
-		Expression: e,
-	}
+	return dialect.OrderBy[*clause.Window](func() clause.OrderDef {
+		return clause.OrderDef{
+			Expression: e,
+		}
+	})
 }
 
 func Range() bob.Mod[*clause.Window] {
