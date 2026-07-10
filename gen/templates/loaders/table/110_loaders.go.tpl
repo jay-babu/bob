@@ -138,7 +138,7 @@ func Build{{$tAlias.UpSingular}}Preloader() {{$tAlias.UpSingular}}Preloader {
             },
             {{- end}}
           },
-        }, {{$.TableVar $rel.Foreign}}.Columns.Names(), {{$fAlias.UpSingular}}ScanMapperNullable, opts...)
+        }, {{$.TableVar $rel.Foreign}}.Columns.Names(), {{$.ScanMapperNullableFunc $rel.Foreign}}, opts...)
     },
     {{end -}}
   }
@@ -392,8 +392,8 @@ func (os {{$tAlias.UpSingular}}Slice) Load{{$relAlias}}(ctx context.Context, exe
 	{{- $useMap := eq (len $side.FromColumns) 1 -}}
 	{{- $local := index $side.FromColumns 0 -}}
 	{{- $foreign := index $side.ToColumns 0 -}}
-	{{- $fromCol := $.Tables.GetColumn $side.From $local -}}
-	{{- $toCol := $.Tables.GetColumn $side.To $foreign -}}
+	{{- $fromCol := $.AllTables.GetColumn $side.From $local -}}
+	{{- $toCol := $.AllTables.GetColumn $side.To $foreign -}}
 	{{- $fromColAlias := index $fromAlias.Columns $local -}}
 	{{- $toColAlias := index $toAlias.Columns $foreign -}}
 	{{- if and $useMap (not ($.Types.CanCompareWithEquals $.CurrentPackage $fromCol.Type)) -}}{{- $useMap = false -}}{{- end -}}
@@ -581,7 +581,7 @@ func (os {{$tAlias.UpSingular}}Slice) Load{{$relAlias}}(ctx context.Context, exe
 	{{- $useMap := eq (len $firstSide.FromColumns) 1 -}}
 	{{- $local := index $firstSide.FromColumns 0 -}}
 	{{- $fromCol := index $firstFrom.Columns $local -}}
-	{{- $fromColDef := $.Tables.GetColumn $firstSide.From $local -}}
+	{{- $fromColDef := $.AllTables.GetColumn $firstSide.From $local -}}
 	{{- if and $useMap (not ($.Types.CanCompareWithEquals $.CurrentPackage $fromColDef.Type)) -}}{{- $useMap = false -}}{{- end -}}
 	{{if $useMap}}
 	// O(N+M) stitch via a map; child key is the carried slice {{$fromCol}}Slice[i] (was O(N*M)).
