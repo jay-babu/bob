@@ -3,18 +3,19 @@ package gen
 import (
 	"crypto/sha1"
 	"encoding/hex"
-	"fmt"
+	"go/token"
 	"path"
 	"path/filepath"
 	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/stephenafamo/bob/gen/drivers"
+	"github.com/stephenafamo/bob/orm"
 )
 
 const (
-	modelPackageSplitModeRelationshipComponents = "relationship_components"
-	defaultModelPackageSplitInternalDir         = "internal/components"
+	modelPackageSplitModeTablePackages = "table_packages"
 
 	modelSplitGenerationFacade    = "facade"
 	modelSplitGenerationComponent = "component"
@@ -33,95 +34,201 @@ type ModelSplitData struct {
 }
 
 type ModelSplitComponent struct {
-	ID          string
-	Package     string
-	OutFolder   string
-	PackagePath string
-	TableKeys   []string
+	ID           string
+	Package      string
+	ImportAlias  string
+	RelativePath string
+	OutFolder    string
+	PackagePath  string
+	TableKeys    []string
+}
+
+func (d *ModelSplitData) GeneratesFacade() bool {
+	return false
 }
 
 func buildModelSplitData[C, I any](
-	config ModelPackageSplit,
 	rootOutFolder string,
 	rootPackagePath string,
 	tables drivers.Tables[C, I],
-	relationships Relationships,
-) (*ModelSplitData, error) {
-	if config.Mode == "" {
-		return nil, nil
+) *ModelSplitData {
+	data := &ModelSplitData{
+		Enabled:         true,
+		Mode:            modelPackageSplitModeTablePackages,
+		RootOutFolder:   rootOutFolder,
+		RootPackagePath: rootPackagePath,
+		Components:      make([]*ModelSplitComponent, 0, len(tables)),
+		TableComponents: make(map[string]*ModelSplitComponent, len(tables)),
 	}
 
-	if config.Mode != modelPackageSplitModeRelationshipComponents {
-		return nil, fmt.Errorf("unknown model package split mode %q", config.Mode)
-	}
-
-	internalDir := config.InternalDir
-	if internalDir == "" {
-		internalDir = defaultModelPackageSplitInternalDir
-	}
-
-	graph := make(map[string]map[string]struct{}, len(tables))
-	tableSet := make(map[string]struct{}, len(tables))
-	for _, table := range tables {
-		graph[table.Key] = map[string]struct{}{}
-		tableSet[table.Key] = struct{}{}
-	}
-
-	addEdge := func(from, to string) {
-		if from == to {
-			return
+	sortedTables := slices.Clone(tables)
+	slices.SortFunc(sortedTables, func(a, b drivers.Table[C, I]) int {
+		return strings.Compare(a.Key, b.Key)
+	})
+	for _, table := range sortedTables {
+		schema, _, found := strings.Cut(table.Key, ".")
+		if !found || schema == "" {
+			schema = "public"
 		}
-		if _, ok := tableSet[from]; !ok {
-			return
+		packageSchema := safeModelPackageSegment(schema)
+		packageTablePath := safeModelPackageSegment(table.Name)
+		packageName := safeGoPackageName(table.Name)
+		relativePath := path.Join(packageSchema, packageTablePath)
+		component := &ModelSplitComponent{
+			ID:           table.Key,
+			Package:      packageName,
+			ImportAlias:  packageName,
+			RelativePath: relativePath,
+			OutFolder:    filepath.Join(rootOutFolder, filepath.FromSlash(relativePath)),
+			PackagePath:  path.Join(rootPackagePath, relativePath),
+			TableKeys:    []string{table.Key},
 		}
-		if _, ok := tableSet[to]; !ok {
-			return
-		}
-		graph[from][to] = struct{}{}
+		data.Components = append(data.Components, component)
+		data.TableComponents[table.Key] = component
 	}
 
-	for tableKey, rels := range relationships {
+	aliasCounts := make(map[string]int, len(data.Components))
+	for _, component := range data.Components {
+		aliasCounts[component.ImportAlias]++
+	}
+	for _, component := range data.Components {
+		if aliasCounts[component.ImportAlias] > 1 {
+			schema, _, _ := strings.Cut(component.RelativePath, "/")
+			component.ImportAlias = safeGoPackageName(schema) + component.Package
+		}
+	}
+
+	clear(aliasCounts)
+	for _, component := range data.Components {
+		aliasCounts[component.ImportAlias]++
+	}
+	for _, component := range data.Components {
+		if aliasCounts[component.ImportAlias] > 1 {
+			component.ImportAlias += stableModelComponentID(component.TableKeys)[:8]
+		}
+	}
+
+	return data
+}
+
+func safeGoPackageName(raw string) string {
+	normalized := strings.Map(func(r rune) rune {
+		switch {
+		case unicode.IsLetter(r):
+			return unicode.ToLower(r)
+		case unicode.IsDigit(r):
+			return r
+		default:
+			return -1
+		}
+	}, raw)
+	if normalized == "" {
+		normalized = "model"
+	}
+	if !token.IsIdentifier(normalized) {
+		normalized = "model" + normalized
+	}
+	return normalized
+}
+
+func safeModelPackageSegment(raw string) string {
+	normalized := strings.Map(func(r rune) rune {
+		switch {
+		case unicode.IsLetter(r):
+			return unicode.ToLower(r)
+		case unicode.IsDigit(r), r == '_':
+			return r
+		default:
+			return '_'
+		}
+	}, raw)
+	if normalized == "" {
+		normalized = "model"
+	}
+	if !token.IsIdentifier(normalized) {
+		normalized = "model_" + normalized
+	}
+	if normalized != raw || !token.IsIdentifier(raw) {
+		normalized += "_" + stableModelComponentID([]string{raw})[:8]
+	}
+	return normalized
+}
+
+func prepareTablePackageRelationships(relationships Relationships) Relationships {
+	forward := make(Relationships, len(relationships))
+	for table, rels := range relationships {
 		for _, rel := range rels {
-			addEdge(tableKey, rel.Foreign())
-			for _, side := range rel.Sides {
-				addEdge(tableKey, side.From)
-				addEdge(tableKey, side.To)
+			if len(rel.Sides) == 1 && rel.Sides[0].Modify == "from" {
+				forward[table] = append(forward[table], rel)
 			}
 		}
 	}
 
-	components := stronglyConnectedModelComponents(graph)
-	slices.SortFunc(components, func(a, b []string) int {
-		return strings.Compare(strings.Join(a, "\x00"), strings.Join(b, "\x00"))
+	return breakRelationshipCycles(forward)
+}
+func breakRelationshipCycles(relationships Relationships) Relationships {
+	type edge struct {
+		from string
+		to   string
+		rel  orm.Relationship
+	}
+
+	edges := make([]edge, 0)
+	for table, rels := range relationships {
+		for _, rel := range rels {
+			edges = append(edges, edge{from: table, to: rel.Foreign(), rel: rel})
+		}
+	}
+	slices.SortFunc(edges, func(a, b edge) int {
+		tableName := func(key string) string {
+			if index := strings.LastIndexByte(key, '.'); index >= 0 {
+				return key[index+1:]
+			}
+			return key
+		}
+		if c := strings.Compare(tableName(a.from), tableName(b.from)); c != 0 {
+			return c
+		}
+		if c := strings.Compare(a.from, b.from); c != 0 {
+			return c
+		}
+		if c := strings.Compare(a.to, b.to); c != 0 {
+			return c
+		}
+		return strings.Compare(a.rel.Name, b.rel.Name)
 	})
 
-	data := &ModelSplitData{
-		Enabled:         true,
-		Mode:            config.Mode,
-		InternalDir:     internalDir,
-		RootOutFolder:   rootOutFolder,
-		RootPackagePath: rootPackagePath,
-		Components:      make([]*ModelSplitComponent, 0, len(components)),
-		TableComponents: make(map[string]*ModelSplitComponent, len(tables)),
+	kept := make(Relationships, len(relationships))
+	graph := make(map[string]map[string]struct{}, len(relationships))
+	var reaches func(string, string, map[string]struct{}) bool
+	reaches = func(from, target string, seen map[string]struct{}) bool {
+		if from == target {
+			return true
+		}
+		if _, ok := seen[from]; ok {
+			return false
+		}
+		seen[from] = struct{}{}
+		for next := range graph[from] {
+			if reaches(next, target, seen) {
+				return true
+			}
+		}
+		return false
 	}
 
-	for _, componentTables := range components {
-		id := stableModelComponentID(componentTables)
-		pkg := "c" + id
-		component := &ModelSplitComponent{
-			ID:          id,
-			Package:     pkg,
-			OutFolder:   filepath.Join(rootOutFolder, filepath.FromSlash(internalDir), pkg),
-			PackagePath: path.Join(rootPackagePath, filepath.ToSlash(internalDir), pkg),
-			TableKeys:   componentTables,
+	for _, e := range edges {
+		if e.from != e.to && reaches(e.to, e.from, map[string]struct{}{}) {
+			continue
 		}
-		data.Components = append(data.Components, component)
-		for _, tableKey := range componentTables {
-			data.TableComponents[tableKey] = component
+		kept[e.from] = append(kept[e.from], e.rel)
+		if graph[e.from] == nil {
+			graph[e.from] = map[string]struct{}{}
 		}
+		graph[e.from][e.to] = struct{}{}
 	}
 
-	return data, nil
+	return kept
 }
 
 func stronglyConnectedModelComponents(graph map[string]map[string]struct{}) [][]string {
@@ -229,11 +336,13 @@ func modelSplitForOutput(split *ModelSplitData, rootOutFolder, rootPackagePath s
 
 	for _, component := range split.Components {
 		c := &ModelSplitComponent{
-			ID:          component.ID,
-			Package:     component.Package,
-			OutFolder:   filepath.Join(rootOutFolder, filepath.FromSlash(split.InternalDir), component.Package),
-			PackagePath: path.Join(rootPackagePath, filepath.ToSlash(split.InternalDir), component.Package),
-			TableKeys:   slices.Clone(component.TableKeys),
+			ID:           component.ID,
+			Package:      component.Package,
+			ImportAlias:  component.ImportAlias,
+			RelativePath: component.RelativePath,
+			OutFolder:    filepath.Join(rootOutFolder, filepath.FromSlash(component.RelativePath)),
+			PackagePath:  path.Join(rootPackagePath, component.RelativePath),
+			TableKeys:    slices.Clone(component.TableKeys),
 		}
 		clone.Components = append(clone.Components, c)
 		if split.CurrentComponent != nil && split.CurrentComponent.ID == component.ID {
