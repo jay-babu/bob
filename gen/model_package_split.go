@@ -1,7 +1,7 @@
 package gen
 
 import (
-	"crypto/sha1"
+	"crypto/sha1" //nolint:gosec // used only for stable non-security identifiers
 	"encoding/hex"
 	"go/token"
 	"path"
@@ -166,6 +166,7 @@ func prepareTablePackageRelationships(relationships Relationships) Relationships
 
 	return breakRelationshipCycles(forward)
 }
+
 func breakRelationshipCycles(relationships Relationships) Relationships {
 	type edge struct {
 		from string
@@ -231,75 +232,8 @@ func breakRelationshipCycles(relationships Relationships) Relationships {
 	return kept
 }
 
-func stronglyConnectedModelComponents(graph map[string]map[string]struct{}) [][]string {
-	var (
-		index      int
-		stack      []string
-		onStack    = map[string]struct{}{}
-		indices    = map[string]int{}
-		lowLinks   = map[string]int{}
-		components [][]string
-	)
-
-	var visit func(string)
-	visit = func(v string) {
-		indices[v] = index
-		lowLinks[v] = index
-		index++
-		stack = append(stack, v)
-		onStack[v] = struct{}{}
-
-		neighbors := make([]string, 0, len(graph[v]))
-		for w := range graph[v] {
-			neighbors = append(neighbors, w)
-		}
-		slices.Sort(neighbors)
-
-		for _, w := range neighbors {
-			if _, ok := indices[w]; !ok {
-				visit(w)
-				lowLinks[v] = min(lowLinks[v], lowLinks[w])
-				continue
-			}
-			if _, ok := onStack[w]; ok {
-				lowLinks[v] = min(lowLinks[v], indices[w])
-			}
-		}
-
-		if lowLinks[v] != indices[v] {
-			return
-		}
-
-		var component []string
-		for {
-			w := stack[len(stack)-1]
-			stack = stack[:len(stack)-1]
-			delete(onStack, w)
-			component = append(component, w)
-			if w == v {
-				break
-			}
-		}
-		slices.Sort(component)
-		components = append(components, component)
-	}
-
-	nodes := make([]string, 0, len(graph))
-	for node := range graph {
-		nodes = append(nodes, node)
-	}
-	slices.Sort(nodes)
-	for _, node := range nodes {
-		if _, ok := indices[node]; !ok {
-			visit(node)
-		}
-	}
-
-	return components
-}
-
 func stableModelComponentID(tableKeys []string) string {
-	hash := sha1.Sum([]byte(strings.Join(tableKeys, "\x00")))
+	hash := sha1.Sum([]byte(strings.Join(tableKeys, "\x00"))) //nolint:gosec // this is a stable identifier, not a security digest
 	return hex.EncodeToString(hash[:])[:10]
 }
 

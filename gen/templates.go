@@ -356,6 +356,53 @@ func (d *TemplateData[T, C, I]) FactoryFromExistingFunc(tableKey string) string 
 	return d.splitRef(tableKey, "FromExisting"+alias.UpSingular)
 }
 
+func (d *TemplateData[T, C, I]) FactoryTables() drivers.Tables[C, I] {
+	if d.ModelSplit == nil || d.ModelSplit.Generation != modelSplitGenerationComponent || d.ModelSplit.CurrentComponent == nil {
+		return d.Tables
+	}
+
+	selected := make(map[string]struct{})
+	queue := append([]string(nil), d.ModelSplit.CurrentComponent.TableKeys...)
+	for len(queue) > 0 {
+		tableKey := queue[0]
+		queue = queue[1:]
+		if _, ok := selected[tableKey]; ok {
+			continue
+		}
+		selected[tableKey] = struct{}{}
+
+		for _, rel := range d.Relationships.Get(tableKey) {
+			queue = append(queue, rel.Foreign())
+			for _, need := range d.AllTables.NeededBridgeRels(rel) {
+				queue = append(queue, need.Table)
+			}
+		}
+	}
+
+	tables := make(drivers.Tables[C, I], 0, len(selected))
+	for _, table := range d.AllTables {
+		if _, ok := selected[table.Key]; ok {
+			tables = append(tables, table)
+		}
+	}
+
+	return tables
+}
+
+func (d *TemplateData[T, C, I]) IsCurrentComponentTable(tableKey string) bool {
+	if d.ModelSplit == nil || d.ModelSplit.CurrentComponent == nil {
+		return false
+	}
+
+	for _, current := range d.ModelSplit.CurrentComponent.TableKeys {
+		if current == tableKey {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (d *TemplateData[T, C, I]) FactoryRelDependencies(r orm.Relationship) string {
 	needed := d.AllTables.NeededBridgeRels(r)
 	ma := make([]string, len(needed))

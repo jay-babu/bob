@@ -14,11 +14,6 @@ const selfJoinSuffix = "__self_join_reverse"
 
 type Relationships map[string][]orm.Relationship
 
-const (
-	relationshipCodegenModeAll   = "all"
-	relationshipCodegenModeToOne = "to_one"
-)
-
 // Set parameters of the relationship (unique, nullables, e.t.c.)
 func initRelationships[C, I any](r Relationships, tables drivers.Tables[C, I]) (err error) {
 	defer func() {
