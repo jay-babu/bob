@@ -1,11 +1,13 @@
 {{- $isSplit := and $.ModelSplit $.ModelSplit.Enabled -}}
 {{- $isFacade := and $isSplit (eq $.ModelSplit.Generation "facade") -}}
-{{- if $isFacade -}}
+{{- $isComponent := and $isSplit (eq $.ModelSplit.Generation "component") -}}
+{{- if or $isFacade $isComponent -}}
+{{- $factoryTables := $.FactoryTables -}}
 {{$.Importer.Import "context"}}
 {{$.Importer.Import "models" (index $.OutputPackages "models") }}
 
 type Factory struct {
-    {{range $table := .Tables}}
+    {{range $table := $factoryTables}}
     {{ $tAlias := $.Aliases.Table $table.Key -}}
 		base{{$tAlias.UpSingular}}Mods {{$tAlias.UpSingular}}ModSlice
     {{- end}}
@@ -15,14 +17,16 @@ func New() *Factory {
 	return &Factory{}
 }
 
-{{range $table := .Tables}}
+{{range $table := $factoryTables}}
 {{ $tAlias := $.Aliases.Table $table.Key -}}
+{{if not ($.IsCurrentComponentTable $table.Key)}}
 type {{$tAlias.UpSingular}}Template = {{$.FactoryTemplateType $table.Key}}
 type {{$tAlias.UpSingular}}Mod = {{$.FactoryModType $table.Key}}
 type {{$tAlias.UpSingular}}ModFunc = {{$.FactoryModFuncType $table.Key}}
 type {{$tAlias.UpSingular}}ModSlice = {{$.FactoryModSliceType $table.Key}}
 
 var {{$tAlias.UpSingular}}Mods = {{$.FactoryModsVar $table.Key}}
+{{end}}
 
 func (f *Factory) New{{$tAlias.UpSingular}}(mods ...{{$tAlias.UpSingular}}Mod) *{{$tAlias.UpSingular}}Template {
 	return f.New{{$tAlias.UpSingular}}WithContext(context.Background(), mods...)

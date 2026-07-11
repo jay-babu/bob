@@ -495,6 +495,51 @@ func expandDrivenThenLoadTemplateData() TemplateData[any, any, any] {
 	}
 }
 
+func TestFactoryFacadeTemplateGeneratesScopedComponentFactory(t *testing.T) {
+	content, err := fs.ReadFile(templates, "templates/factory/bobfactory_facade.bob.go.tpl")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tpl, err := template.New("factory").
+		Funcs(sprig.GenericFuncMap()).
+		Funcs(templateFunctions).
+		Parse(string(content))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	data := expandDrivenThenLoadTemplateData()
+	data.Tables = data.Tables[:1]
+
+	var out bytes.Buffer
+	if err := tpl.Execute(&out, &data); err != nil {
+		t.Fatal(err)
+	}
+
+	got := out.String()
+	for _, want := range []string{
+		"type Factory struct {",
+		"func New() *Factory",
+		"func (f *Factory) NewUserWithContext",
+		"func (f *Factory) NewVideoWithContext",
+		"func (f *Factory) NewCommentWithContext",
+		"func (f *Factory) NewProfileWithContext",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected generated scoped factory to contain %q, got:\n%s", want, got)
+		}
+	}
+	for _, unwanted := range []string{
+		"type UserTemplate = UserTemplate",
+		"var UserMods = UserMods",
+	} {
+		if strings.Contains(got, unwanted) {
+			t.Fatalf("generated scoped factory contains recursive local alias %q:\n%s", unwanted, got)
+		}
+	}
+}
+
 func TestLoadersTemplateGeneratesFacadeExpandThenLoadMethods(t *testing.T) {
 	content, err := fs.ReadFile(templates, "templates/loaders/bob_loaders.bob.go.tpl")
 	if err != nil {
