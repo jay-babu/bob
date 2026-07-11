@@ -206,7 +206,7 @@ func Migrate(ctx context.Context, db *sql.DB, dir fs.FS, pattern string, opts ..
 // on top-level semicolons. It correctly handles dollar-quoted strings
 // (e.g. $$ ... $$ or $tag$ ... $tag$), single-quoted strings, line comments
 // (--), and block comments (/* */).
-func splitStatements(sql string) []string {
+func splitStatements(sql string) []string { //nolint:gocyclo
 	var stmts []string
 	start := 0
 	i := 0
@@ -223,7 +223,7 @@ func splitStatements(sql string) []string {
 		// Block comment: skip to closing */
 		case sql[i] == '/' && i+1 < len(sql) && sql[i+1] == '*':
 			i += 2
-			for i+1 < len(sql) && !(sql[i] == '*' && sql[i+1] == '/') {
+			for i+1 < len(sql) && (sql[i] != '*' || sql[i+1] != '/') {
 				i++
 			}
 			if i+1 < len(sql) {
@@ -257,7 +257,7 @@ func splitStatements(sql string) []string {
 			}
 			if i < len(sql) && sql[i] == '$' {
 				tag := sql[tagStart : i+1] // e.g. "$$" or "$tag$"
-				i++                         // move past closing $ of open tag
+				i++                        // move past closing $ of open tag
 				// Find the matching close tag
 				closeIdx := strings.Index(sql[i:], tag)
 				if closeIdx >= 0 {

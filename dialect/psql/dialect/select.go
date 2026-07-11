@@ -53,7 +53,7 @@ func (s SelectQuery) WriteSQL(ctx context.Context, w io.StringWriter, d bob.Dial
 	return args, err
 }
 
-func (s SelectQuery) WriteSQLTo(ctx context.Context, w io.StringWriter, d bob.Dialect, start int, args *[]any) error {
+func (s SelectQuery) WriteSQLTo(ctx context.Context, w io.StringWriter, d bob.Dialect, start int, args *[]any) error { //nolint:gocyclo
 	var err error
 	baseLen := len(*args)
 	nextStart := func() int {
@@ -355,7 +355,7 @@ func writeTableRefTo(ctx context.Context, w io.StringWriter, d bob.Dialect, star
 			} else {
 				w.WriteString(" ")
 			}
-			writeIndexHint(w, d, hint)
+			writeIndexHint(w, hint)
 		}
 	}
 
@@ -422,7 +422,7 @@ func writeJoinTo(ctx context.Context, w io.StringWriter, d bob.Dialect, start in
 	return nil
 }
 
-func writeIndexHint(w io.StringWriter, d bob.Dialect, hint clause.IndexHint) {
+func writeIndexHint(w io.StringWriter, hint clause.IndexHint) {
 	if hint.Type == "" {
 		return
 	}
