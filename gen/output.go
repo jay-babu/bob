@@ -246,7 +246,7 @@ func cleanGeneratedSubdirectories(root string) error {
 		name := item.Name()
 		name = name[:len(name)-len(filepath.Ext(name))]
 		if strings.HasSuffix(name, ".bob") || strings.HasSuffix(name, ".bob_test") {
-			return os.Remove(path)
+			return os.Remove(path) //nolint:gosec // path comes from the rooted WalkDir traversal
 		}
 		return nil
 	})
@@ -281,7 +281,7 @@ func generateSplitModelOutput[T, C, I any](o *Output, data *TemplateData[T, C, I
 		data.ModelSplit.CurrentComponent = originalComponent
 	}()
 
-	if data.ModelSplit.GeneratesFacade() {
+	if data.ModelSplit.GeneratesFacade() { //nolint:nestif // facade and component generation require distinct cleanup paths
 		if err := o.initOutFolders(); err != nil {
 			return fmt.Errorf("unable to initialize root model output folder: %w", err)
 		}
@@ -425,7 +425,7 @@ func generateFactoryModelsFacade[T, C, I any](
 	if err != nil {
 		return fmt.Errorf("formatting facade: %w", err)
 	}
-	return os.WriteFile(filepath.Join(outFolder, "bob_factory_models.bob.go"), formatted, 0o644)
+	return os.WriteFile(filepath.Join(outFolder, "bob_factory_models.bob.go"), formatted, 0o644) //nolint:gosec // generated Go source should be world-readable
 }
 
 func generateQueryOutput[T, C, I any](o *Output, data *TemplateData[T, C, I], generator string, noTests bool) error {
