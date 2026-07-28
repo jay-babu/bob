@@ -274,3 +274,52 @@ func printTestParents(ps []*testPreloadParent) string {
 	b.WriteString("]")
 	return b.String()
 }
+
+type recordingPreloadQuery struct{ joins []clause.Join }
+
+func (q *recordingPreloadQuery) AppendLoader(...bob.Loader)     {}
+func (q *recordingPreloadQuery) AppendMapperMod(scan.MapperMod) {}
+func (q *recordingPreloadQuery) AppendJoin(j clause.Join)       { q.joins = append(q.joins, j) }
+func (q *recordingPreloadQuery) AppendPreloadSelect(...any)     {}
+
+func preloadJoinAlias(t *testing.T, loader Preloader[*recordingPreloadQuery], parent string) string {
+	t.Helper()
+	mod, _, _ := loader(parent)
+	q := &recordingPreloadQuery{}
+	mod.Apply(q)
+	if len(q.joins) != 1 {
+		t.Fatalf("expected 1 join, got %d", len(q.joins))
+	}
+	return q.joins[0].To.Alias
+}
+
+func cohortItemRel() PreloadRel[bob.Expression] {
+	return PreloadRel[bob.Expression]{
+		Name: "CohortItem",
+		Sides: []PreloadSide[bob.Expression]{{
+			From:        testNameable{name: "entity_item", alias: "entity_item"},
+			To:          testNameable{name: "cohort_item", alias: "cohort_item"},
+			FromColumns: []string{"cohort_item_id"},
+			ToColumns:   []string{"id"},
+		}},
+	}
+}
+
+func TestPreloadPinnedAliasIsPathScopedWhenNested(t *testing.T) {
+	loader := Preload[*testPreloadChild, testPreloadChildSlice](
+		cohortItemRel(), []string{"id", "name"}, nil, PreloadAs[*recordingPreloadQuery]("cohort_item"),
+	)
+
+	if top := preloadJoinAlias(t, loader, ""); top != "cohort_item" {
+		t.Errorf("top-level pinned alias must stay stable, got %q", top)
+	}
+
+	branchA := preloadJoinAlias(t, loader, "bundle_entity_item")
+	branchB := preloadJoinAlias(t, loader, "component_entity_item")
+	if branchA == branchB {
+		t.Fatalf("two parents produced the same alias %q; the joined query would fail with SQLSTATE 42712", branchA)
+	}
+	if branchA != "bundle_entity_item.cohort_item" || branchB != "component_entity_item.cohort_item" {
+		t.Errorf("expected deterministic path-scoped aliases, got %q and %q", branchA, branchB)
+	}
+}

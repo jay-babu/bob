@@ -238,6 +238,7 @@ func Preload[T Preloadable, Ts ~[]T, E bob.Expression, Q PreloadableQuery](rel P
 	}
 
 	return buildPreloader[T](func(parent string) (string, mods.QueryMods[Q]) {
+		nested := parent != ""
 		if parent == "" {
 			parent = rel.Sides[0].From.Alias()
 		}
@@ -246,9 +247,13 @@ func Preload[T Preloadable, Ts ~[]T, E bob.Expression, Q PreloadableQuery](rel P
 		queryMods := make(mods.QueryMods[Q], 0, len(rel.Sides)+1)
 
 		for i, side := range rel.Sides {
-			alias = settings.Alias
-			if settings.Alias == "" {
+			switch {
+			case settings.Alias == "":
 				alias = fmt.Sprintf("%s_%d", side.To.Alias(), bob.NextUniqueInt())
+			case nested:
+				alias = parent + "." + settings.Alias
+			default:
+				alias = settings.Alias
 			}
 			on := make([]bob.Expression, 0, len(side.FromColumns)+len(side.FromWhere)+len(side.ToWhere))
 			for i, fromCol := range side.FromColumns {
