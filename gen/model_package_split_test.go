@@ -4,6 +4,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stephenafamo/bob/gen/drivers"
@@ -102,6 +103,147 @@ func TestBuildModelSplitDataTablePackages(t *testing.T) {
 	}
 	if loyaltyProgram.PackagePath != "example.com/models/public/loyalty_program" {
 		t.Fatalf("loyalty program import path: want example.com/models/public/loyalty_program, got %q", loyaltyProgram.PackagePath)
+	}
+}
+
+func TestGenerateFactoryModelsFacadeImportsOnlySelectedComponents(t *testing.T) {
+	t.Parallel()
+
+	allTables := drivers.Tables[any, any]{
+		{Key: "public.entity", Name: "entity"},
+		{Key: "public.loyalty_program", Name: "loyalty_program"},
+	}
+	modelSplit := buildModelSplitData(
+		"/tmp/models",
+		"example.com/models",
+		allTables,
+	)
+	data := TemplateData[any, any, any]{
+		Aliases: drivers.Aliases{
+			"public.entity": {
+				UpPlural:   "Entities",
+				UpSingular: "Entity",
+			},
+			"public.loyalty_program": {
+				UpPlural:   "LoyaltyPrograms",
+				UpSingular: "LoyaltyProgram",
+			},
+		},
+		Relationships: Relationships{},
+	}
+
+	outFolder := t.TempDir()
+	if err := generateFactoryModelsFacade(outFolder, modelSplit, allTables[:1], &data); err != nil {
+		t.Fatal(err)
+	}
+
+	generated, err := os.ReadFile(filepath.Join(outFolder, "bob_factory_models.bob.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(generated)
+	for _, want := range []string{
+		`entity "example.com/models/public/entity"`,
+		"type Entity = entity.Entity",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected scoped factory model facade to contain %q, got:\n%s", want, got)
+		}
+	}
+	for _, unwanted := range []string{
+		"example.com/models/public/loyalty_program",
+		"type LoyaltyProgram =",
+	} {
+		if strings.Contains(got, unwanted) {
+			t.Fatalf("scoped factory model facade contains unrelated model %q:\n%s", unwanted, got)
+		}
+	}
+}
+
+func TestGenerateComponentFactoryModelsFacadeScopesRelationshipClosure(t *testing.T) {
+	t.Parallel()
+
+	allTables := drivers.Tables[any, any]{
+		{Key: "public.entity", Name: "entity"},
+		{Key: "public.loyalty_program", Name: "loyalty_program"},
+		{Key: "audit.audit_log", Name: "audit_log"},
+	}
+	modelSplit := buildModelSplitData(
+		"/tmp/models",
+		"example.com/models",
+		allTables,
+	)
+	data := TemplateData[any, any, any]{
+		AllTables: allTables,
+		Aliases: drivers.Aliases{
+			"public.entity": {
+				UpPlural:   "Entities",
+				UpSingular: "Entity",
+			},
+			"public.loyalty_program": {
+				UpPlural:   "LoyaltyPrograms",
+				UpSingular: "LoyaltyProgram",
+			},
+			"audit.audit_log": {
+				UpPlural:   "AuditLogs",
+				UpSingular: "AuditLog",
+			},
+		},
+		Relationships: Relationships{
+			"public.entity": {{
+				Name: "entity_loyalty_program_fk",
+				Sides: []orm.RelSide{{
+					From:   "public.entity",
+					To:     "public.loyalty_program",
+					Modify: "from",
+				}},
+			}},
+		},
+		ModelSplit: modelSplit,
+	}
+
+	facadesFolder := t.TempDir()
+	facadesPackage := "example.com/internal/factorymodels"
+	component := modelSplit.TableComponents["public.entity"]
+	gotPackage, err := generateComponentFactoryModelsFacade(
+		facadesFolder,
+		facadesPackage,
+		modelSplit,
+		modelSplit,
+		component,
+		allTables,
+		&data,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantPackage := "example.com/internal/factorymodels/public/entity"
+	if gotPackage != wantPackage {
+		t.Fatalf("component facade package: want %q, got %q", wantPackage, gotPackage)
+	}
+
+	generated, err := os.ReadFile(filepath.Join(
+		facadesFolder,
+		"public",
+		"entity",
+		"bob_factory_models.bob.go",
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(generated)
+	for _, want := range []string{
+		`entity "example.com/models/public/entity"`,
+		`loyaltyprogram "example.com/models/public/loyalty_program"`,
+		"type Entity = entity.Entity",
+		"type LoyaltyProgram = loyaltyprogram.LoyaltyProgram",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected component factory model facade to contain %q, got:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "example.com/models/audit/audit_log") {
+		t.Fatalf("component factory model facade imports unrelated audit model:\n%s", got)
 	}
 }
 
