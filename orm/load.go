@@ -2,7 +2,9 @@ package orm
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"reflect"
 
@@ -209,6 +211,27 @@ type PreloadSide[E bob.Expression] struct {
 	ToWhere   []RelWhere `yaml:"to_where"`
 }
 
+// Postgres truncates identifiers at 63 bytes; cap the alias so
+// alias + "." + the widest selected column still fits, or the scanner
+// can't match the truncated result columns.
+func capPreloadAlias(alias string, columns []string) string {
+	maxCol := 0
+	for _, c := range columns {
+		if len(c) > maxCol {
+			maxCol = len(c)
+		}
+	}
+	if len(alias)+1+maxCol <= 63 {
+		return alias
+	}
+	sum := sha256.Sum256([]byte(alias))
+	keep := 63 - 1 - maxCol - 9 // "_" + 8 hex chars
+	if keep < 0 {
+		keep = 0
+	}
+	return alias[:keep] + "_" + hex.EncodeToString(sum[:4])
+}
+
 type PreloadableQuery interface {
 	Loadable
 	AppendJoin(clause.Join)
@@ -251,7 +274,7 @@ func Preload[T Preloadable, Ts ~[]T, E bob.Expression, Q PreloadableQuery](rel P
 			case settings.Alias == "":
 				alias = fmt.Sprintf("%s_%d", side.To.Alias(), bob.NextUniqueInt())
 			case nested:
-				alias = parent + "." + settings.Alias
+				alias = capPreloadAlias(parent+"."+settings.Alias, settings.Columns)
 			default:
 				alias = settings.Alias
 			}
