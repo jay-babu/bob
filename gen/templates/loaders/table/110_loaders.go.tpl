@@ -1,5 +1,4 @@
 {{$.Importer.Import "fmt" -}}
-{{if $.Relationships.Get .Table.Key}}{{$.Importer.Import "github.com/stephenafamo/bob/orm/loaders"}}{{end -}}
 
 {{$table := .Table}}
 {{$tAlias := .Aliases.Table $table.Key -}}

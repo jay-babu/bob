@@ -1,6 +1,8 @@
 {{$table := index .Tables 0 -}}
+{{$anyRels := false -}}
+{{range $t := .Tables}}{{if $.Relationships.Get $t.Key}}{{$anyRels = true}}{{end}}{{end -}}
 {{if or (not $.IsTablePackage) $.IsModelSplitFacade}}{{$.Importer.Import "github.com/stephenafamo/bob/orm"}}{{end}}
-{{if $.IsModelSplitFacade -}}
+{{if and $.IsModelSplitFacade $anyRels -}}
 {{$.Importer.Import "fmt"}}
 {{$.Importer.Import "github.com/stephenafamo/bob"}}
 {{$.Importer.Import "github.com/stephenafamo/bob/orm/loaders"}}
