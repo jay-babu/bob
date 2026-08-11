@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"text/template"
 
 	"github.com/stephenafamo/bob/gen/drivers"
 	"github.com/stephenafamo/bob/orm"
@@ -59,6 +60,96 @@ func TestModelSplitDoesNotGenerateFacade(t *testing.T) {
 
 	if (&ModelSplitData{}).GeneratesFacade() {
 		t.Fatal("schema/table packages must not generate a root facade")
+	}
+}
+
+func TestGenerateSplitFactoryOutputDoesNotGenerateRootPackage(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com\n\n go 1.26\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	modelsFolder := filepath.Join(root, "bobmodels")
+	factoryFolder := filepath.Join(root, "factory_test")
+	factoryModelsFolder := filepath.Join(root, "internal", "factorymodels")
+	if err := os.MkdirAll(factoryModelsFolder, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for file, contents := range map[string]string{
+		filepath.Join(factoryFolder, "stale_root.bob.go"):                           "generated",
+		filepath.Join(factoryFolder, "custom.go"):                                   "handwritten",
+		filepath.Join(factoryModelsFolder, "bob_factory_models.bob.go"):             "generated",
+		filepath.Join(factoryModelsFolder, "custom.go"):                             "handwritten",
+		filepath.Join(factoryModelsFolder, "public", "entity", "custom_helpers.go"): "handwritten component helper",
+	} {
+		if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(file, []byte(contents), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	tables := drivers.Tables[any, any]{{Key: "public.entity", Schema: "public", Name: "entity"}}
+	modelSplit := buildModelSplitData(modelsFolder, "example.com/bobmodels", tables)
+	data := TemplateData[any, any, any]{
+		Tables:        tables,
+		AllTables:     tables,
+		Aliases:       drivers.Aliases{"public.entity": {UpPlural: "Entities", UpSingular: "Entity"}},
+		Relationships: Relationships{},
+		OutputPackages: map[string]string{
+			"models":  "example.com/bobmodels",
+			"factory": "example.com/factory_test",
+		},
+		ModelSplit: modelSplit,
+	}
+	output := Output{
+		Key:                "factory",
+		PkgName:            "factory_test",
+		OutFolder:          factoryFolder,
+		singletonTemplates: template.Must(template.New("marker.bob.go.tpl").Parse("const GeneratedFor = {{printf \"%q\" .ModelSplit.Generation}}\n")),
+		tableTemplates:     template.New(""),
+		queryTemplates:     template.New(""),
+	}
+
+	if err := generateSplitFactoryOutput(&output, &data, "BobGen", true); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, file := range []string{
+		filepath.Join(factoryFolder, "marker.bob.go"),
+		filepath.Join(factoryFolder, "stale_root.bob.go"),
+		filepath.Join(factoryModelsFolder, "bob_factory_models.bob.go"),
+	} {
+		if _, err := os.Stat(file); !os.IsNotExist(err) {
+			t.Fatalf("root generated file still exists: %s: %v", file, err)
+		}
+	}
+	for _, file := range []string{
+		filepath.Join(factoryFolder, "custom.go"),
+		filepath.Join(factoryModelsFolder, "custom.go"),
+		filepath.Join(factoryModelsFolder, "public", "entity", "custom_helpers.go"),
+		filepath.Join(factoryFolder, "public", "entity", "marker.bob.go"),
+		filepath.Join(factoryModelsFolder, "public", "entity", "bob_factory_models.bob.go"),
+	} {
+		if _, err := os.Stat(file); err != nil {
+			t.Fatalf("expected file missing: %s: %v", file, err)
+		}
+	}
+}
+
+func TestFactoryPackageUsesScopedTablePackage(t *testing.T) {
+	t.Parallel()
+
+	tables := drivers.Tables[any, any]{{Key: "public.entity", Name: "entity"}}
+	data := TemplateData[any, any, any]{
+		OutputPackages: map[string]string{"factory": "example.com/factory_test"},
+		ModelSplit:     buildModelSplitData("/tmp/models", "example.com/models", tables),
+	}
+
+	if got, want := data.FactoryPackage("public.entity"), "example.com/factory_test/public/entity"; got != want {
+		t.Fatalf("factory package: want %q, got %q", want, got)
 	}
 }
 

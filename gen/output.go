@@ -343,10 +343,12 @@ func generateSplitFactoryOutput[T, C, I any](o *Output, data *TemplateData[T, C,
 
 	factoryModelsFolder := filepath.Join(filepath.Dir(originalSplit.RootOutFolder), "internal", "factorymodels")
 	factoryModelsPackage := path.Join(path.Dir(originalSplit.RootPackagePath), "internal", "factorymodels")
-	if err := generateFactoryModelsFacade(factoryModelsFolder, originalSplit, originalTables, data); err != nil {
-		return fmt.Errorf("generating factory models facade: %w", err)
+	if err := os.MkdirAll(factoryModelsFolder, os.ModePerm); err != nil {
+		return fmt.Errorf("initializing factory models folder: %w", err)
 	}
-	data.OutputPackages["models"] = factoryModelsPackage
+	if err := cleanGeneratedSubdirectories(factoryModelsFolder); err != nil {
+		return fmt.Errorf("cleaning old factory models output: %w", err)
+	}
 
 	factorySplit := modelSplitForOutput(originalSplit, o.OutFolder, data.OutputPackages[o.Key])
 	data.ModelSplit = factorySplit
@@ -360,13 +362,6 @@ func generateSplitFactoryOutput[T, C, I any](o *Output, data *TemplateData[T, C,
 		}
 	} else if err := os.RemoveAll(filepath.Join(o.OutFolder, filepath.FromSlash(factorySplit.InternalDir))); err != nil {
 		return fmt.Errorf("removing old split factory output: %w", err)
-	}
-
-	data.Tables = originalTables
-	data.ModelSplit.Generation = modelSplitGenerationFacade
-	data.ModelSplit.CurrentComponent = nil
-	if err := generateSingletonOutput(o, data, generator, noTests); err != nil {
-		return fmt.Errorf("root facade singleton output: %w", err)
 	}
 
 	for _, component := range data.ModelSplit.Components {
@@ -441,10 +436,10 @@ func generateFactoryModelsFacade[T, C, I any](
 	tables drivers.Tables[C, I],
 	data *TemplateData[T, C, I],
 ) error {
-	if err := os.RemoveAll(outFolder); err != nil {
+	if err := os.MkdirAll(outFolder, os.ModePerm); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(outFolder, os.ModePerm); err != nil {
+	if err := cleanGeneratedSubdirectories(outFolder); err != nil {
 		return err
 	}
 
