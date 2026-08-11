@@ -180,6 +180,20 @@ func (d *TemplateData[T, C, I]) ModelPackage(tableKey string) string {
 	return importAlias
 }
 
+func (d *TemplateData[T, C, I]) FactoryPackage(tableKey string) string {
+	root := d.OutputPackages["factory"]
+	if root == "" || d.ModelSplit == nil || !d.ModelSplit.Enabled {
+		return root
+	}
+
+	component := d.ModelSplit.TableComponents[tableKey]
+	if component == nil {
+		return root
+	}
+
+	return path.Join(root, component.RelativePath)
+}
+
 func (d *TemplateData[T, C, I]) IsModelSplitFacade() bool {
 	return d.ModelSplit != nil && d.ModelSplit.Enabled && d.ModelSplit.Generation == modelSplitGenerationFacade
 }
