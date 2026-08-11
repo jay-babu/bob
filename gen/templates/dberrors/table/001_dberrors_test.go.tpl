@@ -4,7 +4,7 @@
 {{$.Importer.Import "context"}}
 {{$.Importer.Import "errors"}}
 {{$.Importer.Import "testing"}}
-{{$.Importer.Import "factory" (index $.OutputPackages "factory") }}
+{{$.Importer.Import "factory" ($.FactoryPackage $table.Key) }}
 {{$.Importer.Import "github.com/stephenafamo/bob"}}
 
 func Test{{$tAlias.UpSingular}}UniqueConstraintErrors(t *testing.T) {
