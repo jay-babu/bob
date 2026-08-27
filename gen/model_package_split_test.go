@@ -71,8 +71,8 @@ func TestGenerateSplitFactoryOutputDoesNotGenerateRootPackage(t *testing.T) {
 		t.Fatal(err)
 	}
 	modelsFolder := filepath.Join(root, "bobmodels")
-	factoryFolder := filepath.Join(root, "factory_test")
-	factoryModelsFolder := filepath.Join(root, "internal", "factorymodels")
+	factoryFolder := filepath.Join(root, "_factory_test")
+	factoryModelsFolder := filepath.Join(root, "_factorymodels")
 	if err := os.MkdirAll(factoryModelsFolder, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestGenerateSplitFactoryOutputDoesNotGenerateRootPackage(t *testing.T) {
 		Relationships: Relationships{},
 		OutputPackages: map[string]string{
 			"models":  "example.com/bobmodels",
-			"factory": "example.com/factory_test",
+			"factory": "example.com/_factory_test",
 		},
 		ModelSplit: modelSplit,
 	}
@@ -144,11 +144,11 @@ func TestFactoryPackageUsesScopedTablePackage(t *testing.T) {
 
 	tables := drivers.Tables[any, any]{{Key: "public.entity", Name: "entity"}}
 	data := TemplateData[any, any, any]{
-		OutputPackages: map[string]string{"factory": "example.com/factory_test"},
+		OutputPackages: map[string]string{"factory": "example.com/_factory_test"},
 		ModelSplit:     buildModelSplitData("/tmp/models", "example.com/models", tables),
 	}
 
-	if got, want := data.FactoryPackage("public.entity"), "example.com/factory_test/public/entity"; got != want {
+	if got, want := data.FactoryPackage("public.entity"), "example.com/_factory_test/public/entity"; got != want {
 		t.Fatalf("factory package: want %q, got %q", want, got)
 	}
 }
@@ -294,7 +294,7 @@ func TestGenerateComponentFactoryModelsFacadeScopesRelationshipClosure(t *testin
 	}
 
 	facadesFolder := t.TempDir()
-	facadesPackage := "example.com/internal/factorymodels"
+	facadesPackage := "example.com/_factorymodels"
 	component := modelSplit.TableComponents["public.entity"]
 	gotPackage, err := generateComponentFactoryModelsFacade(
 		facadesFolder,
@@ -308,7 +308,7 @@ func TestGenerateComponentFactoryModelsFacadeScopesRelationshipClosure(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantPackage := "example.com/internal/factorymodels/public/entity"
+	wantPackage := "example.com/_factorymodels/public/entity"
 	if gotPackage != wantPackage {
 		t.Fatalf("component facade package: want %q, got %q", wantPackage, gotPackage)
 	}
