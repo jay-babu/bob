@@ -341,8 +341,8 @@ func generateSplitFactoryOutput[T, C, I any](o *Output, data *TemplateData[T, C,
 		data.OutputPackages["models"] = originalModelsPackage
 	}()
 
-	factoryModelsFolder := filepath.Join(filepath.Dir(originalSplit.RootOutFolder), "internal", "factorymodels")
-	factoryModelsPackage := path.Join(path.Dir(originalSplit.RootPackagePath), "internal", "factorymodels")
+	factoryModelsFolder := filepath.Join(filepath.Dir(originalSplit.RootOutFolder), "_factorymodels")
+	factoryModelsPackage := path.Join(path.Dir(originalSplit.RootPackagePath), "_factorymodels")
 	if err := os.MkdirAll(factoryModelsFolder, os.ModePerm); err != nil {
 		return fmt.Errorf("initializing factory models folder: %w", err)
 	}
