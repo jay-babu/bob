@@ -271,7 +271,13 @@ func TestTablePackageSingletonTemplatesAreFlattened(t *testing.T) {
 				"var Preload = BuildUserPreloader()",
 				"SelectThenLoad = BuildUserThenLoader[*dialect.SelectQuery]()",
 			},
-			notContain: []string{"type preloaders struct", "User UserPreloader"},
+			notContain: []string{
+				"type preloaders struct",
+				"User UserPreloader",
+				"type ExpandLoadOption",
+				"func thenLoadBuilder",
+				"func buildExpandTree",
+			},
 		},
 	}
 
@@ -568,7 +574,7 @@ func TestLoadersTemplateGeneratesFacadeExpandThenLoadMethods(t *testing.T) {
 		"User expandUserThenLoader[Q]",
 		"type expandUserThenLoader[Q orm.Loadable] struct {",
 		"cusers.UserThenLoader[Q]",
-		"func (l expandUserThenLoader[Q]) ForExpandMap(expands map[string]struct{}, opts ...ExpandLoadOption) ([]bob.Mod[Q], error)",
+		"func (l expandUserThenLoader[Q]) ForExpandMap(expands map[string]struct{}, opts ...loaders.ExpandLoadOption) ([]bob.Mod[Q], error)",
 		"case \"videos\":",
 		"childMods, err := SelectThenLoad.Video.forExpandTree(child, depth+1, opts)",
 		"mods = append(mods, l.Videos(childMods...))",
@@ -607,7 +613,7 @@ func TestLoadersTemplateGeneratesFacadeExpandPreloadMethods(t *testing.T) {
 		"User expandUserPreloader",
 		"type expandUserPreloader struct {",
 		"cusers.UserPreloader",
-		"func (l expandUserPreloader) ForExpandMap(expands map[string]struct{}, opts ...ExpandLoadOption) ([]bob.Mod[*dialect.SelectQuery], error)",
+		"func (l expandUserPreloader) ForExpandMap(expands map[string]struct{}, opts ...loaders.ExpandLoadOption) ([]bob.Mod[*dialect.SelectQuery], error)",
 		"case \"profile\":",
 		"mods = append(mods, l.Profile(append(childOpts, psql.PreloadAs(\"profile\"))...))",
 	} {
@@ -663,10 +669,10 @@ func TestLoadersTemplateGeneratesExpandDrivenThenLoadMethods(t *testing.T) {
 
 	got := out.String()
 	for _, want := range []string{
-		"func (l UserThenLoader[Q]) ForExpandMap(expands map[string]struct{}, opts ...ExpandLoadOption) ([]bob.Mod[Q], error)",
-		"func (l UserThenLoader[Q]) ForExpandPaths(paths []string, opts ...ExpandLoadOption) ([]bob.Mod[Q], error)",
+		"func (l UserThenLoader[Q]) ForExpandMap(expands map[string]struct{}, opts ...loaders.ExpandLoadOption) ([]bob.Mod[Q], error)",
+		"func (l UserThenLoader[Q]) ForExpandPaths(paths []string, opts ...loaders.ExpandLoadOption) ([]bob.Mod[Q], error)",
 		"case \"profile\":",
-		"if len(child.children) > 0 {",
+		"if len(child.Children) > 0 {",
 		"mods = append(mods, l.Profile())",
 		"case \"videos\":",
 		"expand path %q cannot be nested because Video is generated in another model component",
@@ -710,8 +716,8 @@ func TestLoadersTemplateGeneratesExpandDrivenPreloadMethods(t *testing.T) {
 
 	got := out.String()
 	for _, want := range []string{
-		"func (l UserPreloader) ForExpandMap(expands map[string]struct{}, opts ...ExpandLoadOption) ([]bob.Mod[*dialect.SelectQuery], error)",
-		"func (l UserPreloader) ForExpandPaths(paths []string, opts ...ExpandLoadOption) ([]bob.Mod[*dialect.SelectQuery], error)",
+		"func (l UserPreloader) ForExpandMap(expands map[string]struct{}, opts ...loaders.ExpandLoadOption) ([]bob.Mod[*dialect.SelectQuery], error)",
+		"func (l UserPreloader) ForExpandPaths(paths []string, opts ...loaders.ExpandLoadOption) ([]bob.Mod[*dialect.SelectQuery], error)",
 		"case \"profile\":",
 		"mods = append(mods, l.Profile(append(childOpts, psql.PreloadAs(\"profile\"))...))",
 	} {
