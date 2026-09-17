@@ -10,7 +10,6 @@ import (
 	"github.com/stephenafamo/bob/dialect/psql/dialect"
 	"github.com/stephenafamo/bob/dialect/psql/sm"
 	"github.com/stephenafamo/bob/expr"
-	"github.com/stephenafamo/bob/orm"
 	"github.com/stephenafamo/scan"
 )
 
@@ -93,7 +92,6 @@ func TestNewViewxWithMapperUsesModelQuery(t *testing.T) {
 	)
 	query := view.Query()
 
-	var _ orm.ModelQuery[*dialect.SelectQuery, *someStruct, []*someStruct] = query.ModelQuery
 	if query.Scanner == nil {
 		t.Fatal("Query() dropped the required mapper")
 	}

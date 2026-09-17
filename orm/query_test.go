@@ -256,7 +256,7 @@ func TestModelQueryTypedOperations(t *testing.T) {
 	t.Cleanup(func() { _ = db.Close() })
 	db.SetMaxOpenConns(1)
 
-	if _, err := db.Exec(`CREATE TABLE items (id INTEGER PRIMARY KEY); INSERT INTO items (id) VALUES (1), (2)`); err != nil {
+	if _, err := db.ExecContext(context.Background(), `CREATE TABLE items (id INTEGER PRIMARY KEY); INSERT INTO items (id) VALUES (1), (2)`); err != nil {
 		t.Fatal(err)
 	}
 	exec := bob.NewDB(db)
