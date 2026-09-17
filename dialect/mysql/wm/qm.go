@@ -52,7 +52,8 @@ func FromPreceding(exp any) bob.Mod[*clause.Window] {
 		w.SetStart(bob.ExpressionFunc(
 			func(ctx context.Context, w io.StringWriter, d bob.Dialect, start int) ([]any, error) {
 				return bob.ExpressIf(ctx, w, d, start, exp, true, "", " PRECEDING")
-			}),
+			},
+		),
 		)
 	})
 }
@@ -68,7 +69,8 @@ func FromFollowing(exp any) bob.Mod[*clause.Window] {
 		w.SetStart(bob.ExpressionFunc(
 			func(ctx context.Context, w io.StringWriter, d bob.Dialect, start int) ([]any, error) {
 				return bob.ExpressIf(ctx, w, d, start, exp, true, "", " FOLLOWING")
-			}),
+			},
+		),
 		)
 	})
 }
@@ -78,7 +80,8 @@ func ToPreceding(exp any) bob.Mod[*clause.Window] {
 		w.SetEnd(bob.ExpressionFunc(
 			func(ctx context.Context, w io.StringWriter, d bob.Dialect, start int) ([]any, error) {
 				return bob.ExpressIf(ctx, w, d, start, exp, true, "", " PRECEDING")
-			}),
+			},
+		),
 		)
 	})
 }
@@ -94,7 +97,8 @@ func ToFollowing(exp any) bob.Mod[*clause.Window] {
 		w.SetEnd(bob.ExpressionFunc(
 			func(ctx context.Context, w io.StringWriter, d bob.Dialect, start int) ([]any, error) {
 				return bob.ExpressIf(ctx, w, d, start, exp, true, "", " FOLLOWING")
-			}),
+			},
+		),
 		)
 	})
 }

@@ -323,7 +323,8 @@ func (tables Tables[C, I]) SetFactoryDeps(currPkg string, i language.Importer, t
 				currPkg, i, types, aliases,
 				kside.TableName, mapp.ExternalTable,
 				mapp.Column, mapp.ExternalColumn,
-				extObjVarName, false)
+				extObjVarName, false,
+			)
 
 			mret = append(mret, fmt.Sprintf(`%s.%s = %s //h2`,
 				objVarName,

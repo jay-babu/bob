@@ -25,7 +25,7 @@
         {{- $fAlias := $.Aliases.Table $rel.Foreign -}}
         {{- $relAlias := $tAlias.Relationship $rel.Name -}}
         {{$relAlias}}: ModAs[Q, {{$.ColumnsType $rel.Foreign}}] {
-          c: {{$.TableVar $rel.Foreign}}.Columns,
+          c: {{$.RelationVar $rel.Foreign}}.Columns,
           f: func(to {{$.ColumnsType $rel.Foreign}}) bob.Mod[Q] {
             {{if gt (len $rel.Sides) 1 -}}{{$.Importer.Import "strconv" -}}
               uniqueSuffix := strconv.FormatUint(bob.NextUniqueInt(), 10)
@@ -34,9 +34,9 @@
 
             {{range $index, $side := $rel.Sides -}}
             {{- $from := $.Aliases.Table $side.From -}}
-            {{- $fromCols := printf "%s.Columns" ($.TableVar $side.From) -}}
+            {{- $fromCols := printf "%s.Columns" ($.RelationVar $side.From) -}}
             {{- $to := $.Aliases.Table $side.To -}}
-            {{- $toCols := printf "%s.Columns" ($.TableVar $side.To) -}}
+            {{- $toCols := printf "%s.Columns" ($.RelationVar $side.To) -}}
             {{- $toTable := $.AllTables.Get $side.To -}}
             {
               {{if ne $index 0 -}}
@@ -45,7 +45,7 @@
               {{if ne $index (sub (len $rel.Sides) 1) -}}
               to := {{$toCols}}.AliasedAs({{$toCols}}.Alias() + uniqueSuffix)
               {{end -}}
-              mods = append(mods, dialect.Join[Q](typ, {{$.TableVar $side.To}}.NameExpr().As(to.Alias())).On(
+              mods = append(mods, dialect.Join[Q](typ, {{$.RelationVar $side.To}}.NameExpr().As(to.Alias())).On(
                   {{range $i, $local := $side.FromColumns -}}
                     {{- $fromCol := index $from.Columns $local -}}
                     {{- $toCol := index $to.Columns (index $side.ToColumns $i) -}}

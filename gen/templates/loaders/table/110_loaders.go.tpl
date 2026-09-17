@@ -97,8 +97,8 @@ func Build{{$tAlias.UpSingular}}Preloader() {{$tAlias.UpSingular}}Preloader {
             {{- $fromTable := $.AllTables.Get $side.From -}}
             {{- $toTable = $.AllTables.Get $side.To -}}
             {
-              From: {{$.TableVar $side.From}},
-              To: {{$.TableVar $side.To}},
+              From: {{$.RelationVar $side.From}},
+              To: {{$.RelationVar $side.To}},
               {{if $side.FromColumns -}}
               FromColumns: []string{
                 {{- range $name := $side.FromColumns -}}
@@ -138,7 +138,7 @@ func Build{{$tAlias.UpSingular}}Preloader() {{$tAlias.UpSingular}}Preloader {
             },
             {{- end}}
           },
-        }, {{$.TableVar $rel.Foreign}}.Columns.Names(), {{$.ScanMapperNullableFunc $rel.Foreign}}, opts...)
+        }, {{$.RelationVar $rel.Foreign}}.Columns.Names(), {{$.ScanMapperNullableFunc $rel.Foreign}}, opts...)
     },
     {{end -}}
   }
@@ -601,7 +601,7 @@ func (os {{$tAlias.UpSingular}}Slice) Load{{$relAlias}}(ctx context.Context, exe
   }
 
 	if len(sq.SelectList.Columns) == 0 {
-		mods = append(mods, sm.Columns({{$.TableVar $rel.Foreign}}.Columns))
+		mods = append(mods, sm.Columns({{$.RelationVar $rel.Foreign}}.Columns))
 	}
 
 	q := os.{{relQueryMethodName $tAlias $relAlias}}(append(
@@ -609,7 +609,7 @@ func (os {{$tAlias.UpSingular}}Slice) Load{{$relAlias}}(ctx context.Context, exe
 		{{range $index, $local := $firstSide.FromColumns -}}
 			{{- $toCol := index $firstTo.Columns (index $firstSide.ToColumns $index) -}}
 			{{- $fromCol := index $firstFrom.Columns $local -}}
-			sm.Columns({{$.TableVar $firstSide.To}}.Columns.{{$toCol}}.As("related_{{$firstSide.From}}.{{$fromCol}}")),
+			sm.Columns({{$.RelationVar $firstSide.To}}.Columns.{{$toCol}}.As("related_{{$firstSide.From}}.{{$fromCol}}")),
 		{{- end}}
 	)...)
 

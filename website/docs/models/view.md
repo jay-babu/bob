@@ -27,7 +27,7 @@ var userView = psql.NewView[*User, bob.Expression]("public", "users", expr.ColsF
 
 :::tip
 
-The `NewViewx()` function takes an extra type parameter to determine how slices of the corresponding table struct are returned, and a `scan.Mapper` used to scan rows for every query built from the view. Pass `nil` to fall back to the reflection-based `scan.StructMapper`.
+The `NewViewx()` function takes an extra type parameter to determine how slices of the corresponding table struct are returned, and requires a `scan.Mapper` used to scan rows for every query built from the view. Use `NewView()` when reflection-based `scan.StructMapper` behavior is desired.
 
 :::
 

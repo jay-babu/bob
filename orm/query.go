@@ -94,6 +94,73 @@ func (q Query[Q, T, Ts, Tr]) Each(ctx context.Context, exec bob.Executor) (func(
 	return bob.Each(ctx, exec, q, q.Scanner)
 }
 
+// ModelQuery is the query implementation used by generated table models.
+// It keeps the generated model and named slice types while avoiding the extra
+// transformer and ExecQuery instantiations needed by the general Query type.
+type ModelQuery[Q bob.Expression, T any, Ts ~[]T] struct {
+	bob.BaseQuery[Q]
+	Hooks   *bob.Hooks[Q, bob.SkipQueryHooksKey]
+	Scanner scan.Mapper[T]
+}
+
+func (q ModelQuery[Q, T, Ts]) Clone() ModelQuery[Q, T, Ts] {
+	return ModelQuery[Q, T, Ts]{
+		BaseQuery: q.BaseQuery.Clone(),
+		Hooks:     q.Hooks,
+		Scanner:   q.Scanner,
+	}
+}
+
+func (q ModelQuery[Q, T, Ts]) With(mods ...bob.Mod[Q]) ModelQuery[Q, T, Ts] {
+	clone := q.Clone()
+	clone.Apply(mods...)
+
+	return clone
+}
+
+func (q ModelQuery[Q, T, Ts]) RunHooks(ctx context.Context, exec bob.Executor) (context.Context, error) {
+	ctx, err := q.BaseQuery.RunHooks(ctx, exec)
+	if err != nil {
+		return ctx, err
+	}
+
+	if q.Hooks == nil {
+		return ctx, nil
+	}
+
+	return q.Hooks.RunHooks(ctx, exec, q.BaseQuery.Expression)
+}
+
+// Execute the query.
+func (q ModelQuery[Q, T, Ts]) Exec(ctx context.Context, exec bob.Executor) (int64, error) {
+	result, err := bob.Exec(ctx, exec, q)
+	if err != nil {
+		return 0, err
+	}
+
+	return result.RowsAffected()
+}
+
+// First matching row.
+func (q ModelQuery[Q, T, Ts]) One(ctx context.Context, exec bob.Executor) (T, error) {
+	return bob.One(ctx, exec, q, q.Scanner)
+}
+
+// All matching rows.
+func (q ModelQuery[Q, T, Ts]) All(ctx context.Context, exec bob.Executor) (Ts, error) {
+	return bob.Allx[bob.SliceTransformer[T, Ts]](ctx, exec, q, q.Scanner)
+}
+
+// Cursor to scan through the results.
+func (q ModelQuery[Q, T, Ts]) Cursor(ctx context.Context, exec bob.Executor) (scan.ICursor[T], error) {
+	return bob.Cursor(ctx, exec, q, q.Scanner)
+}
+
+// Each scans through the results.
+func (q ModelQuery[Q, T, Ts]) Each(ctx context.Context, exec bob.Executor) (func(func(T, error) bool), error) {
+	return bob.Each(ctx, exec, q, q.Scanner)
+}
+
 type ModExecQuery[Q bob.Expression, E bob.Expression] struct {
 	ExecQuery[E]
 	Mod   bob.Mod[Q]

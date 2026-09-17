@@ -10,6 +10,7 @@ import (
 	"github.com/stephenafamo/bob/dialect/psql/dialect"
 	"github.com/stephenafamo/bob/dialect/psql/sm"
 	"github.com/stephenafamo/bob/expr"
+	"github.com/stephenafamo/scan"
 )
 
 type someStruct struct {
@@ -75,6 +76,44 @@ func TestSomeViewQueryWithoutSchema(t *testing.T) {
 	if query != expected {
 		t.Errorf("Expected '%#v' but got '%#v'", expected, query)
 	}
+}
+
+func TestNewViewxUsesModelQuery(t *testing.T) {
+	mapperCalled := false
+	mapper := func(context.Context, []string) (func(*scan.Row) (any, error), func(any) (*someStruct, error)) {
+		mapperCalled = true
+		return nil, nil
+	}
+	view := NewViewx[*someStruct, []*someStruct](
+		"public",
+		"some_struct",
+		expr.ColsForStruct[someStruct]("some_struct"),
+		mapper,
+	)
+	query := view.Query()
+
+	if query.Scanner == nil {
+		t.Fatal("Query() dropped the required mapper")
+	}
+	query.Scanner(context.Background(), nil)
+	if !mapperCalled {
+		t.Fatal("Query() did not preserve the supplied mapper")
+	}
+}
+
+func TestNewViewxRequiresMapper(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("NewViewx accepted a nil mapper")
+		}
+	}()
+
+	NewViewx[*someStruct, []*someStruct](
+		"public",
+		"some_struct",
+		expr.ColsForStruct[someStruct]("some_struct"),
+		nil,
+	)
 }
 
 func selectToString(t *testing.T, query bob.BaseQuery[*dialect.SelectQuery], argsLen int) string {

@@ -65,6 +65,20 @@ func (r Relationships) Get(table string) []orm.Relationship {
 	return r[table]
 }
 
+func (r Relationships) UsesTable(table string) bool {
+	for _, rels := range r {
+		for _, rel := range rels {
+			for _, side := range rel.Sides {
+				if side.From == table || side.To == table {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
 func (rs Relationships) GlobalKey(r orm.Relationship) string {
 	tables := []string{r.Local(), r.Foreign()}
 	slices.Sort(tables)

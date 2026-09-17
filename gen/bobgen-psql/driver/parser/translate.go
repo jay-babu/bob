@@ -233,7 +233,8 @@ func (t *Translator) addPgGenericArrayType(types drivers.Types, singleTyp string
             })`, singleTyp, singleComparer),
 		CompareExprImports: append(append(
 			[]string{`"slices"`},
-			singleTypDef.CompareExprImports...),
+			singleTypDef.CompareExprImports...,
+		),
 			singleTypDef.Imports...),
 	})
 
