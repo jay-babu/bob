@@ -260,6 +260,26 @@ func (d *TemplateData[T, C, I]) TableVar(tableKey string) string {
 	return d.splitRef(tableKey, alias.UpPlural)
 }
 
+func (d *TemplateData[T, C, I]) RelationVar(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, alias.UpPlural+"Relation")
+}
+
+func (d *TemplateData[T, C, I]) QueryFunc(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, "Query"+alias.UpPlural)
+}
+
+func (d *TemplateData[T, C, I]) InsertOneFunc(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, "Insert"+alias.UpSingular)
+}
+
+func (d *TemplateData[T, C, I]) InsertAllFunc(tableKey string) string {
+	alias := d.TableAlias(tableKey)
+	return d.splitRef(tableKey, "Insert"+alias.UpPlural)
+}
+
 func (d *TemplateData[T, C, I]) ColumnsType(tableKey string) string {
 	alias := d.TableAlias(tableKey)
 	return d.splitRef(tableKey, alias.UpSingular+"Columns")

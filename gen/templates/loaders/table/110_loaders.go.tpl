@@ -97,8 +97,8 @@ func Build{{$tAlias.UpSingular}}Preloader() {{$tAlias.UpSingular}}Preloader {
             {{- $fromTable := $.AllTables.Get $side.From -}}
             {{- $toTable = $.AllTables.Get $side.To -}}
             {
-              From: {{$.TableVar $side.From}},
-              To: {{$.TableVar $side.To}},
+              From: {{$.RelationVar $side.From}},
+              To: {{$.RelationVar $side.To}},
               {{if $side.FromColumns -}}
               FromColumns: []string{
                 {{- range $name := $side.FromColumns -}}
@@ -138,7 +138,7 @@ func Build{{$tAlias.UpSingular}}Preloader() {{$tAlias.UpSingular}}Preloader {
             },
             {{- end}}
           },
-        }, {{$.TableVar $rel.Foreign}}.Columns.Names(), {{$.ScanMapperNullableFunc $rel.Foreign}}, opts...)
+        }, {{$.RelationVar $rel.Foreign}}.Columns.Names(), {{$.ScanMapperNullableFunc $rel.Foreign}}, opts...)
     },
     {{end -}}
   }
@@ -601,13 +601,13 @@ func (os {{$tAlias.UpSingular}}Slice) Load{{$relAlias}}(ctx context.Context, exe
 		// before the related_* columns below, so it sees exactly what they set
 		bob.ModFunc[*dialect.SelectQuery](func(q *dialect.SelectQuery) {
 			if len(q.SelectList.Columns) == 0 {
-				sm.Columns({{$.TableVar $rel.Foreign}}.Columns).Apply(q)
+				sm.Columns({{$.RelationVar $rel.Foreign}}.Columns).Apply(q)
 			}
 		}),
 		{{range $index, $local := $firstSide.FromColumns -}}
 			{{- $toCol := index $firstTo.Columns (index $firstSide.ToColumns $index) -}}
 			{{- $fromCol := index $firstFrom.Columns $local -}}
-			sm.Columns({{$.TableVar $firstSide.To}}.Columns.{{$toCol}}.As("related_{{$firstSide.From}}.{{$fromCol}}")),
+			sm.Columns({{$.RelationVar $firstSide.To}}.Columns.{{$toCol}}.As("related_{{$firstSide.From}}.{{$fromCol}}")),
 		{{- end}}
 	)...)
 

@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Changed
+
+- **BREAKING:** `NewViewx` and `NewTablex` now require a non-nil `scan.Mapper`; generated models pass their reflection-free mapper directly. Use `NewView` or `NewTable` for reflection-based mapping.
+- Generated relationship code now uses lightweight relation metadata and owner-package query/insert functions instead of referencing foreign generic table values. This preserves generated relationship APIs while avoiding unrelated foreign mutation-query instantiations.
+
 ## [v0.45.0] - 2026-05-28
 
 ### Added

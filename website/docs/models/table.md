@@ -39,7 +39,7 @@ var userTable = psql.NewTable[any, User, UserSetter]("public", "users")
 
 :::tip
 
-The `NewTablex()` function takes an extra type parameter to determine how slices are returned, and a `scan.Mapper` used to scan rows for every query built from the table. Pass `nil` to fall back to the reflection-based `scan.StructMapper`.
+The `NewTablex()` function takes an extra type parameter to determine how slices are returned, and requires a `scan.Mapper` used to scan rows for every query built from the table. Use `NewTable()` when reflection-based `scan.StructMapper` behavior is desired.
 
 :::
 

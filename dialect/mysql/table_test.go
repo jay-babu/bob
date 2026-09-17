@@ -15,6 +15,7 @@ import (
 	"github.com/stephenafamo/bob/internal"
 	"github.com/stephenafamo/bob/orm"
 	testutils "github.com/stephenafamo/bob/test/utils"
+	"github.com/stephenafamo/scan"
 )
 
 type WithAutoIncr struct {
@@ -46,9 +47,9 @@ type OptionalWithUnique struct {
 }
 
 var (
-	table1 = NewTablex[*WithAutoIncr, []*WithAutoIncr, *OptionalWithAutoIncr]("", expr.ColsForStruct[WithAutoIncr](""), nil)
+	table1 = NewTablex[*WithAutoIncr, []*WithAutoIncr, *OptionalWithAutoIncr]("", expr.ColsForStruct[WithAutoIncr](""), scan.StructMapper[*WithAutoIncr]())
 	table2 = NewTablex[*WithUnique, []*WithUnique, *OptionalWithUnique](
-		"books", expr.ColsForStruct[WithUnique]("books"), nil, []string{"id"}, []string{"title", "author_id"},
+		"books", expr.ColsForStruct[WithUnique]("books"), scan.StructMapper[*WithUnique](), []string{"id"}, []string{"title", "author_id"},
 	)
 )
 
