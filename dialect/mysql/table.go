@@ -33,8 +33,25 @@ func NewTable[T any, Tset setter[T], C bob.Expression](tableName string, columns
 // NewTablex creates a new Table with a custom scanner.
 // If scanner is nil, it falls back to [scan.StructMapper].
 func NewTablex[T any, Tslice ~[]T, Tset setter[T], C bob.Expression](tableName string, columns C, scanner scan.Mapper[T], uniques ...[]string) *Table[T, Tslice, Tset, C] {
+	if scanner == nil {
+		scanner = scan.StructMapper[T]()
+	}
+
+	return newTableWithMapper[T, Tslice, Tset](tableName, columns, scanner, uniques...)
+}
+
+// NewTablexWithMapper creates a new Table with a required custom scanner.
+func NewTablexWithMapper[T any, Tslice ~[]T, Tset setter[T], C bob.Expression](tableName string, columns C, scanner scan.Mapper[T], uniques ...[]string) *Table[T, Tslice, Tset, C] {
+	if scanner == nil {
+		panic("mysql: nil mapper passed to NewTablexWithMapper")
+	}
+
+	return newTableWithMapper[T, Tslice, Tset](tableName, columns, scanner, uniques...)
+}
+
+func newTableWithMapper[T any, Tslice ~[]T, Tset setter[T], C bob.Expression](tableName string, columns C, scanner scan.Mapper[T], uniques ...[]string) *Table[T, Tslice, Tset, C] {
 	setMapping := mappings.GetMappings(reflect.TypeOf(*new(Tset)))
-	view, mappings := newView[T, Tslice](tableName, columns, scanner)
+	view, mappings := newViewWithMapper[T, Tslice](tableName, columns, scanner)
 	t := &Table[T, Tslice, Tset, C]{
 		View:             view,
 		pkCols:           expr.NewColumnsExpr(mappings.PKs...).WithParent(view.alias),

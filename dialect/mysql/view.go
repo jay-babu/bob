@@ -20,15 +20,25 @@ func NewView[T any, C bob.Expression](tableName string, columns C) *View[T, []T,
 // NewViewx creates a new View with a custom scanner.
 // If scanner is nil, it falls back to [scan.StructMapper].
 func NewViewx[T any, Tslice ~[]T, C bob.Expression](tableName string, columns C, scanner scan.Mapper[T]) *View[T, Tslice, C] {
-	v, _ := newView[T, Tslice](tableName, columns, scanner)
-	return v
-}
-
-func newView[T any, Tslice ~[]T, C bob.Expression](tableName string, columns C, scanner scan.Mapper[T]) (*View[T, Tslice, C], mappings.Mapping) {
 	if scanner == nil {
 		scanner = scan.StructMapper[T]()
 	}
 
+	v, _ := newViewWithMapper[T, Tslice](tableName, columns, scanner)
+	return v
+}
+
+// NewViewxWithMapper creates a new View with a required custom scanner.
+func NewViewxWithMapper[T any, Tslice ~[]T, C bob.Expression](tableName string, columns C, scanner scan.Mapper[T]) *View[T, Tslice, C] {
+	if scanner == nil {
+		panic("mysql: nil mapper passed to NewViewxWithMapper")
+	}
+
+	v, _ := newViewWithMapper[T, Tslice](tableName, columns, scanner)
+	return v
+}
+
+func newViewWithMapper[T any, Tslice ~[]T, C bob.Expression](tableName string, columns C, scanner scan.Mapper[T]) (*View[T, Tslice, C], mappings.Mapping) {
 	mappings := mappings.GetMappings(reflect.TypeOf(*new(T)))
 
 	return &View[T, Tslice, C]{
@@ -85,12 +95,10 @@ func (v *View[T, Tslice, C]) ColumnsExpr() expr.ColumnsExpr {
 // Query starts a select query on the view
 func (v *View[T, Tslice, C]) Query(queryMods ...bob.Mod[*dialect.SelectQuery]) *ViewQuery[T, Tslice] {
 	q := &ViewQuery[T, Tslice]{
-		Query: orm.Query[*dialect.SelectQuery, T, Tslice, bob.SliceTransformer[T, Tslice]]{
-			ExecQuery: orm.ExecQuery[*dialect.SelectQuery]{
-				BaseQuery: Select(sm.From(v.NameAsExpr())),
-				Hooks:     &v.SelectQueryHooks,
-			},
-			Scanner: v.scanner,
+		ModelQuery: orm.ModelQuery[*dialect.SelectQuery, T, Tslice]{
+			BaseQuery: Select(sm.From(v.NameAsExpr())),
+			Hooks:     &v.SelectQueryHooks,
+			Scanner:   v.scanner,
 		},
 	}
 
@@ -109,7 +117,7 @@ func (v *View[T, Tslice, C]) Query(queryMods ...bob.Mod[*dialect.SelectQuery]) *
 }
 
 type ViewQuery[T any, Ts ~[]T] struct {
-	orm.Query[*dialect.SelectQuery, T, Ts, bob.SliceTransformer[T, Ts]]
+	orm.ModelQuery[*dialect.SelectQuery, T, Ts]
 }
 
 func (v *ViewQuery[T, Ts]) Clone() *ViewQuery[T, Ts] {
@@ -117,9 +125,7 @@ func (v *ViewQuery[T, Ts]) Clone() *ViewQuery[T, Ts] {
 		return nil
 	}
 
-	return &ViewQuery[T, Ts]{
-		Query: v.Query.Clone(),
-	}
+	return &ViewQuery[T, Ts]{ModelQuery: v.ModelQuery.Clone()}
 }
 
 func (v *ViewQuery[T, Ts]) With(queryMods ...bob.Mod[*dialect.SelectQuery]) *ViewQuery[T, Ts] {

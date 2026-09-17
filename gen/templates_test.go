@@ -36,6 +36,34 @@ func (i testImporter) ToList() []string {
 	return out
 }
 
+func TestModelTemplatesUseMapperRequiredConstructors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		fsys fs.FS
+		path string
+	}{
+		{name: "shared", fsys: templates, path: "templates/models/table/001_types.go.tpl"},
+		{name: "mysql", fsys: mysqlTemplates, path: "bobgen-mysql/templates/models/table/100_blocks.go.tpl"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			content, err := fs.ReadFile(tt.fsys, tt.path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			generated := string(content)
+			for _, constructor := range []string{"NewViewxWithMapper", "NewTablexWithMapper"} {
+				if !strings.Contains(generated, constructor) {
+					t.Fatalf("expected %s to use %s", tt.path, constructor)
+				}
+			}
+		})
+	}
+}
+
 func Test_enumValToIdentifier(t *testing.T) {
 	tests := []struct {
 		val      string
