@@ -19,5 +19,4 @@ func TestRelationMetadata(t *testing.T) {
 	}
 	var _ bob.Expression = relation.Columns
 	var _ bob.Expression = relation.NameExpr()
-	var _ bob.Expression = relation.NameAsExpr()
 }
