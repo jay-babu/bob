@@ -14,24 +14,14 @@ import (
 )
 
 func NewView[T any, C bob.Expression](tableName string, columns C) *View[T, []T, C] {
-	return NewViewx[T, []T](tableName, columns, nil)
-}
-
-// NewViewx creates a new View with a custom scanner.
-// If scanner is nil, it falls back to [scan.StructMapper].
-func NewViewx[T any, Tslice ~[]T, C bob.Expression](tableName string, columns C, scanner scan.Mapper[T]) *View[T, Tslice, C] {
-	if scanner == nil {
-		scanner = scan.StructMapper[T]()
-	}
-
-	v, _ := newViewWithMapper[T, Tslice](tableName, columns, scanner)
+	v, _ := newViewWithMapper[T, []T](tableName, columns, scan.StructMapper[T]())
 	return v
 }
 
-// NewViewxWithMapper creates a new View with a required custom scanner.
-func NewViewxWithMapper[T any, Tslice ~[]T, C bob.Expression](tableName string, columns C, scanner scan.Mapper[T]) *View[T, Tslice, C] {
+// NewViewx creates a new View with a required custom scanner.
+func NewViewx[T any, Tslice ~[]T, C bob.Expression](tableName string, columns C, scanner scan.Mapper[T]) *View[T, Tslice, C] {
 	if scanner == nil {
-		panic("mysql: nil mapper passed to NewViewxWithMapper")
+		panic("mysql: nil mapper passed to NewViewx")
 	}
 
 	v, _ := newViewWithMapper[T, Tslice](tableName, columns, scanner)

@@ -78,13 +78,13 @@ func TestSomeViewQueryWithoutSchema(t *testing.T) {
 	}
 }
 
-func TestNewViewxWithMapperUsesModelQuery(t *testing.T) {
+func TestNewViewxUsesModelQuery(t *testing.T) {
 	mapperCalled := false
 	mapper := func(context.Context, []string) (func(*scan.Row) (any, error), func(any) (*someStruct, error)) {
 		mapperCalled = true
 		return nil, nil
 	}
-	view := NewViewxWithMapper[*someStruct, []*someStruct](
+	view := NewViewx[*someStruct, []*someStruct](
 		"public",
 		"some_struct",
 		expr.ColsForStruct[someStruct]("some_struct"),
@@ -101,14 +101,14 @@ func TestNewViewxWithMapperUsesModelQuery(t *testing.T) {
 	}
 }
 
-func TestNewViewxWithMapperRequiresMapper(t *testing.T) {
+func TestNewViewxRequiresMapper(t *testing.T) {
 	defer func() {
 		if recover() == nil {
-			t.Fatal("NewViewxWithMapper accepted a nil mapper")
+			t.Fatal("NewViewx accepted a nil mapper")
 		}
 	}()
 
-	NewViewxWithMapper[*someStruct, []*someStruct](
+	NewViewx[*someStruct, []*someStruct](
 		"public",
 		"some_struct",
 		expr.ColsForStruct[someStruct]("some_struct"),

@@ -55,10 +55,13 @@ func TestModelTemplatesUseMapperRequiredConstructors(t *testing.T) {
 				t.Fatal(err)
 			}
 			generated := string(content)
-			for _, constructor := range []string{"NewViewxWithMapper", "NewTablexWithMapper"} {
+			for _, constructor := range []string{"NewViewx", "NewTablex"} {
 				if !strings.Contains(generated, constructor) {
 					t.Fatalf("expected %s to use %s", tt.path, constructor)
 				}
+			}
+			if strings.Contains(generated, "WithMapper") {
+				t.Fatalf("expected %s to use the canonical constructors", tt.path)
 			}
 		})
 	}

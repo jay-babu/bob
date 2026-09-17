@@ -23,23 +23,13 @@ type (
 )
 
 func NewTable[T any, Tset setter[T], C bob.Expression](schema, tableName string, columns C) *Table[T, []T, Tset, C] {
-	return NewTablex[T, []T, Tset](schema, tableName, columns, nil)
+	return newTableWithMapper[T, []T, Tset](schema, tableName, columns, scan.StructMapper[T]())
 }
 
-// NewTablex creates a new Table with a custom scanner.
-// If scanner is nil, it falls back to [scan.StructMapper].
+// NewTablex creates a new Table with a required custom scanner.
 func NewTablex[T any, Tslice ~[]T, Tset setter[T], C bob.Expression](schema, tableName string, columns C, scanner scan.Mapper[T]) *Table[T, Tslice, Tset, C] {
 	if scanner == nil {
-		scanner = scan.StructMapper[T]()
-	}
-
-	return newTableWithMapper[T, Tslice, Tset](schema, tableName, columns, scanner)
-}
-
-// NewTablexWithMapper creates a new Table with a required custom scanner.
-func NewTablexWithMapper[T any, Tslice ~[]T, Tset setter[T], C bob.Expression](schema, tableName string, columns C, scanner scan.Mapper[T]) *Table[T, Tslice, Tset, C] {
-	if scanner == nil {
-		panic("sqlite: nil mapper passed to NewTablexWithMapper")
+		panic("sqlite: nil mapper passed to NewTablex")
 	}
 
 	return newTableWithMapper[T, Tslice, Tset](schema, tableName, columns, scanner)
