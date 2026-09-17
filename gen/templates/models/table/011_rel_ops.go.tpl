@@ -64,9 +64,9 @@
     {{- if $rel.IsToMany}}}{{end}}
 
     {{if $rel.IsToMany -}}
-      ret, err := {{$.TableVar $side.TableName}}.Insert(bob.ToMods({{$ftable.DownPlural}}{{$rel.ForeignPosition}}...)).All(ctx, exec)
+      ret, err := {{$.InsertAllFunc $side.TableName}}(ctx, exec, {{$ftable.DownPlural}}{{$rel.ForeignPosition}}...)
     {{- else -}}
-      ret, err := {{$.TableVar $side.TableName}}.Insert({{$to}}).One(ctx, exec)
+      ret, err := {{$.InsertOneFunc $side.TableName}}(ctx, exec, {{$to}})
     {{- end}}
     if err != nil {
         return ret, fmt.Errorf("insert{{$tAlias.UpSingular}}{{$relAlias}}{{$index}}: %w", err)
@@ -164,9 +164,9 @@
 
     {{if ($sideTable.IsJoinTableForRel $rel $side.Position) -}}
       {{if $rel.NeedsMany $side.Position -}}
-        {{$sideAlias.DownPlural}}{{$side.Position}}, err := {{$.TableVar $side.TableName}}.Insert(bob.ToMods(setters...)).All(ctx, exec)
+        {{$sideAlias.DownPlural}}{{$side.Position}}, err := {{$.InsertAllFunc $side.TableName}}(ctx, exec, setters...)
       {{- else -}}
-        {{$sideAlias.DownSingular}}{{$side.Position}}, err := {{$.TableVar $side.TableName}}.Insert(setter).One(ctx, exec)
+        {{$sideAlias.DownSingular}}{{$side.Position}}, err := {{$.InsertOneFunc $side.TableName}}(ctx, exec, setter)
       {{- end}}
     {{- else -}}
       {{if $rel.NeedsMany $side.Position -}}
@@ -193,7 +193,7 @@
 	    var err error
 
 	    {{if $rel.InsertEarly -}}
-	      {{$to}}, err := {{$.TableVar $rel.Foreign}}.Insert(related).One(ctx, exec)
+	      {{$to}}, err := {{$.InsertOneFunc $rel.Foreign}}(ctx, exec, related)
       if err != nil {
           return fmt.Errorf("inserting related objects: %w", err)
       }
@@ -275,7 +275,7 @@
     var err error
 
     {{if $rel.InsertEarly -}}
-      inserted, err := {{$.TableVar $rel.Foreign}}.Insert(bob.ToMods(related...)).All(ctx, exec)
+      inserted, err := {{$.InsertAllFunc $rel.Foreign}}(ctx, exec, related...)
       if err != nil {
           return fmt.Errorf("inserting related objects: %w", err)
       }

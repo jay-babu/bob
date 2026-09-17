@@ -67,6 +67,54 @@ func TestModelTemplatesUseMapperRequiredConstructors(t *testing.T) {
 	}
 }
 
+func TestRelationshipTemplatesUseLightweightRuntime(t *testing.T) {
+	t.Parallel()
+
+	data := expandDrivenThenLoadTemplateData()
+	data.Tables = drivers.Tables[any, any]{data.AllTables[0]}
+	data.ModelSplit.Mode = modelPackageSplitModeTablePackages
+	data.ModelSplit.Generation = modelSplitGenerationComponent
+	data.ModelSplit.CurrentComponent = data.ModelSplit.TableComponents["users"]
+
+	content, err := fs.ReadFile(templates, "templates/models/table/009_rel_query.go.tpl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tpl, err := template.New("relations").Funcs(sprig.GenericFuncMap()).Funcs(templateFunctions).Parse(string(content))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := tpl.Execute(&out, &data); err != nil {
+		t.Fatal(err)
+	}
+	generated := out.String()
+	for _, want := range []string{"cvideos.QueryVideos(", "cvideos.VideosRelation.Columns.UserID"} {
+		if !strings.Contains(generated, want) {
+			t.Fatalf("expected generated relationship code to contain %q:\n%s", want, generated)
+		}
+	}
+	for _, unwanted := range []string{"cvideos.Videos.Query(", "cvideos.Videos.Columns"} {
+		if strings.Contains(generated, unwanted) {
+			t.Fatalf("generated relationship code retained full foreign table reference %q:\n%s", unwanted, generated)
+		}
+	}
+}
+
+func TestRelationshipsUsesTable(t *testing.T) {
+	t.Parallel()
+
+	relationships := expandDrivenThenLoadTemplateData().Relationships
+	for _, table := range []string{"users", "videos", "comments", "profiles"} {
+		if !relationships.UsesTable(table) {
+			t.Fatalf("expected relationships to use %q", table)
+		}
+	}
+	if relationships.UsesTable("unrelated") {
+		t.Fatal("did not expect unrelated table to need relationship runtime")
+	}
+}
+
 func Test_enumValToIdentifier(t *testing.T) {
 	tests := []struct {
 		val      string
