@@ -275,8 +275,10 @@ func TestSelect(t *testing.T) {
 								wm.PartitionBy("presale_id"),
 								wm.OrderBy("created_date"),
 							),
-						).Minus(psql.Quote("created_date")).As("difference")),
-					sm.From("presales_presalestatus")),
+						).Minus(psql.Quote("created_date")).As("difference"),
+					),
+					sm.From("presales_presalestatus"),
+				),
 				).As("differnce_by_status"),
 				sm.Where(psql.Quote("status").In(psql.S("A"), psql.S("B"), psql.S("C"))),
 				sm.GroupBy("status"),
@@ -303,7 +305,8 @@ func TestSelect(t *testing.T) {
 				sm.From("users"),
 				sm.Where(
 					psql.Group(psql.Quote("id"), psql.Quote("employee_id")).
-						In(psql.ArgGroup(100, 200), psql.ArgGroup(300, 400))),
+						In(psql.ArgGroup(100, 200), psql.ArgGroup(300, 400)),
+				),
 			),
 			ExpectedSQL:  `SELECT id, name FROM users WHERE (("id", "employee_id") IN (($1, $2), ($3, $4)))`,
 			ExpectedArgs: []any{100, 200, 300, 400},

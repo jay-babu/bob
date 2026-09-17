@@ -3657,7 +3657,8 @@ func (v *visitor) VisitBindExpressionAtom(ctx *mysqlparser.BindExpressionAtomCon
 				EditedPosition: [2]int{start, start + 1},
 			})
 			return nil
-		}),
+		},
+	),
 	)
 
 	return nil

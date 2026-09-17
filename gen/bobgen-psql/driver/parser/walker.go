@@ -479,7 +479,8 @@ func (w *walker) walkParamRef(a *pg.ParamRef) nodeInfo {
 				edited:   [2]int{start, end},
 			})
 			return nil
-		}),
+		},
+	),
 	)
 
 	return info
@@ -715,10 +716,12 @@ func (w *walker) walkSortBy(a *pg.SortBy) nodeInfo {
 	switch {
 	case hasSortNulls:
 		info.end = w.getEndOfTokenAfter(
-			info.start, pg.Token_FIRST_P, pg.Token_LAST_P)
+			info.start, pg.Token_FIRST_P, pg.Token_LAST_P,
+		)
 	case hasSortDir && a.SortbyDir != pg.SortByDir_SORTBY_USING:
 		info.end = w.getEndOfTokenAfter(
-			info.start, pg.Token_ASC, pg.Token_DESC)
+			info.start, pg.Token_ASC, pg.Token_DESC,
+		)
 	}
 	return info
 }
