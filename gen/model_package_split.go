@@ -17,6 +17,7 @@ import (
 const (
 	modelPackageSplitModeTablePackages = "table_packages"
 	factoryRelationshipsPackage        = "relationships"
+	factoryParentsPackage              = "parents"
 
 	modelSplitGenerationFacade    = "facade"
 	modelSplitGenerationComponent = "component"
@@ -166,6 +167,80 @@ func prepareTablePackageRelationships(relationships Relationships) Relationships
 	}
 
 	return breakRelationshipCycles(forward)
+}
+
+func prepareFactoryParentRelationships(relationships Relationships) Relationships {
+	parents := make(Relationships, len(relationships))
+	for table, rels := range relationships {
+		for _, rel := range rels {
+			if len(rel.Sides) == 1 && rel.Sides[0].Modify == "from" && !rel.IsToMany() {
+				parents[table] = append(parents[table], rel)
+			}
+		}
+	}
+
+	return breakRelationshipCycles(parents)
+}
+
+func buildFactoryParentsSplit(
+	modelSplit *ModelSplitData,
+	rootTableKey string,
+	rootOutFolder string,
+	rootPackagePath string,
+	relationships Relationships,
+) (*ModelSplitData, Relationships) {
+	selected := map[string]struct{}{}
+	queue := []string{rootTableKey}
+	for len(queue) > 0 {
+		tableKey := queue[0]
+		queue = queue[1:]
+		if _, ok := selected[tableKey]; ok {
+			continue
+		}
+		selected[tableKey] = struct{}{}
+		for _, rel := range relationships.Get(tableKey) {
+			queue = append(queue, rel.Foreign())
+		}
+	}
+
+	rootComponent := modelSplit.TableComponents[rootTableKey]
+	relativePath := path.Join(rootComponent.RelativePath, factoryParentsPackage)
+	component := &ModelSplitComponent{
+		ID:           rootTableKey + "/" + factoryParentsPackage,
+		Package:      factoryParentsPackage,
+		ImportAlias:  factoryParentsPackage,
+		RelativePath: relativePath,
+		OutFolder:    filepath.Join(rootOutFolder, filepath.FromSlash(relativePath)),
+		PackagePath:  path.Join(rootPackagePath, relativePath),
+	}
+	parentSplit := &ModelSplitData{
+		Enabled:         true,
+		Mode:            modelSplit.Mode,
+		RootOutFolder:   rootOutFolder,
+		RootPackagePath: rootPackagePath,
+		Components:      []*ModelSplitComponent{component},
+		TableComponents: make(map[string]*ModelSplitComponent, len(selected)),
+	}
+	for _, originalComponent := range modelSplit.Components {
+		for _, tableKey := range originalComponent.TableKeys {
+			if _, ok := selected[tableKey]; !ok {
+				continue
+			}
+			component.TableKeys = append(component.TableKeys, tableKey)
+			parentSplit.TableComponents[tableKey] = component
+		}
+	}
+
+	closureRelationships := make(Relationships, len(selected))
+	for _, tableKey := range component.TableKeys {
+		for _, rel := range relationships.Get(tableKey) {
+			if _, ok := selected[rel.Foreign()]; ok {
+				closureRelationships[tableKey] = append(closureRelationships[tableKey], rel)
+			}
+		}
+	}
+
+	return parentSplit, closureRelationships
 }
 
 func breakRelationshipCycles(relationships Relationships) Relationships {

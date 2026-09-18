@@ -128,6 +128,145 @@ func TestGenerateSplitFactoryOutputGeneratesShallowAndRelationshipVariants(t *te
 	}
 }
 
+func TestGenerateSplitFactoryOutputGeneratesFlattenedParentBundles(t *testing.T) {
+	t.Parallel()
+
+	output, data := splitParentFactoryTestFixture(t, BaseTemplates.Factory)
+	staleParentsDir := filepath.Join(output.OutFolder, "public", "child", factoryParentsPackage)
+	for file, contents := range map[string]string{
+		filepath.Join(staleParentsDir, "stale.bob.go"): "generated",
+		filepath.Join(staleParentsDir, "custom.go"):    "handwritten",
+	} {
+		if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(file, []byte(contents), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := generateSplitFactoryOutput(&output, &data, "BobGen", true); err != nil {
+		t.Fatal(err)
+	}
+
+	parentsFolder := filepath.Join(output.OutFolder, "public", "child", factoryParentsPackage)
+	for _, table := range []string{"child", "parent", "guardian", "grandparent"} {
+		if _, err := os.Stat(filepath.Join(parentsFolder, "public."+table+".bob.go")); err != nil {
+			t.Fatalf("parent bundle table file missing for %s: %v", table, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(parentsFolder, "public.unrelated.bob.go")); !os.IsNotExist(err) {
+		t.Fatalf("unrelated table generated in parent bundle: %v", err)
+	}
+	if err := filepath.WalkDir(parentsFolder, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil || entry.IsDir() || !strings.HasSuffix(entry.Name(), ".bob.go") {
+			return err
+		}
+		generated, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if strings.Contains(string(generated), "example.com/_factory_test/") {
+			t.Fatalf("flattened parent bundle imports a sibling factory package in %s:\n%s", path, generated)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	child := readTestFile(t, filepath.Join(parentsFolder, "public.child.bob.go"))
+	for _, want := range []string{
+		"package parents",
+		"WithParentsCascading",
+		"WithParent",
+		"WithNewParent",
+		"WithExistingParent",
+		"WithoutParent",
+		"WithGuardian",
+		"WithNewGuardian",
+		"WithExistingGuardian",
+		"WithoutGuardian",
+		"|| o.GuardianID != nil",
+		`models "example.com/_factorymodels/public/child/parents"`,
+	} {
+		if !strings.Contains(child, want) {
+			t.Fatalf("flattened parent factory missing %q:\n%s", want, child)
+		}
+	}
+	for _, unwanted := range []string{
+		"example.com/_factory_test/public/parent",
+		"example.com/_factory_test/public/guardian",
+		"example.com/_factory_test/public/grandparent",
+		"WithChildren",
+		"WithUnrelated",
+	} {
+		if strings.Contains(child, unwanted) {
+			t.Fatalf("flattened parent factory contains %q:\n%s", unwanted, child)
+		}
+	}
+
+	parent := readTestFile(t, filepath.Join(parentsFolder, "public.parent.bob.go"))
+	for _, want := range []string{"WithGrandparent", "WithNewGrandparent", "WithExistingGrandparent"} {
+		if !strings.Contains(parent, want) {
+			t.Fatalf("flattened transitive parent factory missing %q:\n%s", want, parent)
+		}
+	}
+
+	parentModels := readTestFile(t, filepath.Join(
+		filepath.Dir(data.ModelSplit.RootOutFolder),
+		"_factorymodels", "public", "child", factoryParentsPackage, "bob_factory_models.bob.go",
+	))
+	for _, want := range []string{
+		`child "example.com/bobmodels/public/child"`,
+		`parent "example.com/bobmodels/public/parent"`,
+		`guardian "example.com/bobmodels/public/guardian"`,
+		`grandparent "example.com/bobmodels/public/grandparent"`,
+	} {
+		if !strings.Contains(parentModels, want) {
+			t.Fatalf("parent model facade missing closure import %q:\n%s", want, parentModels)
+		}
+	}
+	if strings.Contains(parentModels, "example.com/bobmodels/public/unrelated") {
+		t.Fatalf("parent model facade imports unrelated model:\n%s", parentModels)
+	}
+
+	if _, err := os.Stat(filepath.Join(staleParentsDir, "stale.bob.go")); !os.IsNotExist(err) {
+		t.Fatalf("stale parent generated file still exists: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(staleParentsDir, "custom.go")); err != nil {
+		t.Fatalf("parent handwritten file was removed: %v", err)
+	}
+}
+
+func TestGenerateSplitFactoryOutputRestoresTemplateStateAfterParentError(t *testing.T) {
+	t.Parallel()
+
+	templates := fstest.MapFS{
+		"marker.bob.go.tpl": &fstest.MapFile{Data: []byte("const Generated = true\n")},
+		"table/fail.go.tpl": &fstest.MapFile{Data: []byte(`
+{{if eq $.ModelSplit.CurrentComponent.Package "parents"}}{{fail "forced parent generation failure"}}{{end}}
+const TableGenerated = true
+`)},
+	}
+	output, data := splitFactoryTestFixture(t, templates)
+	originalTables := data.Tables
+	originalRelationships := data.Relationships
+	originalModelSplit := data.ModelSplit
+	originalModelsPackage := data.OutputPackages["models"]
+	originalPkgName := data.PkgName
+	originalTable := data.Table
+	originalCurrentPackage := data.CurrentPackage
+	originalImporter := data.Importer
+	originalLanguage := data.Language
+
+	err := generateSplitFactoryOutput(&output, &data, "BobGen", true)
+	if err == nil || !strings.Contains(err.Error(), "forced parent generation failure") {
+		t.Fatalf("expected forced parent generation failure, got %v", err)
+	}
+	assertSplitFactoryTemplateState(t, data, originalTables, originalRelationships, originalModelSplit,
+		originalModelsPackage, originalPkgName, originalTable, originalCurrentPackage, originalImporter, originalLanguage)
+}
+
 func TestGenerateSplitFactoryOutputRestoresTemplateStateAfterError(t *testing.T) {
 	t.Parallel()
 
@@ -252,6 +391,69 @@ func splitFactoryTestFixture(t *testing.T, factoryTemplates fs.FS) (Output, Temp
 	if err := output.initTemplates(nil); err != nil {
 		t.Fatal(err)
 	}
+
+	return output, data
+}
+
+func splitParentFactoryTestFixture(t *testing.T, factoryTemplates fs.FS) (Output, TemplateData[any, any, any]) {
+	t.Helper()
+
+	output, data := splitFactoryTestFixture(t, factoryTemplates)
+	data.Tables[0].Columns = append(data.Tables[0].Columns,
+		drivers.Column{Name: "guardian_id", Type: "string", Nullable: true},
+	)
+	data.Tables[0].Constraints.Foreign = append(data.Tables[0].Constraints.Foreign,
+		drivers.ForeignKey[any]{
+			Constraint:     drivers.Constraint[any]{Name: "child_guardian_fk", Columns: []string{"guardian_id"}},
+			ForeignTable:   "public.guardian",
+			ForeignColumns: []string{"id"},
+		},
+	)
+	data.Tables[1].Columns = append(data.Tables[1].Columns,
+		drivers.Column{Name: "grandparent_id", Type: "string"},
+	)
+	data.Tables[1].Constraints.Foreign = append(data.Tables[1].Constraints.Foreign,
+		drivers.ForeignKey[any]{
+			Constraint:     drivers.Constraint[any]{Name: "parent_grandparent_fk", Columns: []string{"grandparent_id"}},
+			ForeignTable:   "public.grandparent",
+			ForeignColumns: []string{"id"},
+		},
+	)
+	data.Tables = append(data.Tables,
+		drivers.Table[any, any]{
+			Key:         "public.guardian",
+			Schema:      "public",
+			Name:        "guardian",
+			Columns:     []drivers.Column{{Name: "id", Type: "string"}},
+			Constraints: drivers.Constraints[any]{Primary: &drivers.Constraint[any]{Name: "guardian_pkey", Columns: []string{"id"}}},
+		},
+		drivers.Table[any, any]{
+			Key:         "public.grandparent",
+			Schema:      "public",
+			Name:        "grandparent",
+			Columns:     []drivers.Column{{Name: "id", Type: "string"}},
+			Constraints: drivers.Constraints[any]{Primary: &drivers.Constraint[any]{Name: "grandparent_pkey", Columns: []string{"id"}}},
+		},
+		drivers.Table[any, any]{
+			Key:         "public.unrelated",
+			Schema:      "public",
+			Name:        "unrelated",
+			Columns:     []drivers.Column{{Name: "id", Type: "string"}},
+			Constraints: drivers.Constraints[any]{Primary: &drivers.Constraint[any]{Name: "unrelated_pkey", Columns: []string{"id"}}},
+		},
+	)
+	data.AllTables = data.Tables
+	data.Relationships = buildRelationships(data.Tables)
+	if err := initRelationships(data.Relationships, data.Tables); err != nil {
+		t.Fatal(err)
+	}
+	aliases := drivers.Aliases{}
+	if err := initAliases(aliases, data.Tables, data.Relationships, data.RelationLoadedName); err != nil {
+		t.Fatal(err)
+	}
+	data.Aliases = aliases
+	data.Relationships = prepareTablePackageRelationships(data.Relationships)
+	data.ModelSplit = buildModelSplitData(data.ModelSplit.RootOutFolder, data.ModelSplit.RootPackagePath, data.Tables)
 
 	return output, data
 }
@@ -701,6 +903,53 @@ func TestBuildModelSplitDataDisambiguatesSameTableAcrossSchemas(t *testing.T) {
 	}
 	if reference.PackagePath != "example.com/models/reference/widget" || reference.ImportAlias != "referencewidget" {
 		t.Fatalf("unexpected reference widget component: %#v", reference)
+	}
+}
+
+func TestPrepareFactoryParentRelationshipsKeepsOnlyAcyclicForwardToOneEdges(t *testing.T) {
+	t.Parallel()
+
+	rootParent := orm.Relationship{
+		Name:  "root_parent_fk",
+		Sides: []orm.RelSide{{From: "root", To: "parent", Modify: "from", ToUnique: true}},
+	}
+	parentGrandparent := orm.Relationship{
+		Name:  "parent_grandparent_fk",
+		Sides: []orm.RelSide{{From: "parent", To: "grandparent", Modify: "from", ToUnique: true}},
+	}
+	cycleClosing := orm.Relationship{
+		Name:  "grandparent_root_fk",
+		Sides: []orm.RelSide{{From: "grandparent", To: "root", Modify: "from", ToUnique: true}},
+	}
+	reverseToMany := orm.Relationship{
+		Name:  "root_children_fk",
+		Sides: []orm.RelSide{{From: "root", To: "child", Modify: "to", ToUnique: false}},
+	}
+	reverseToOne := orm.Relationship{
+		Name:  "root_only_child_fk",
+		Sides: []orm.RelSide{{From: "root", To: "only_child", Modify: "to", ToUnique: true}},
+	}
+	multiSide := orm.Relationship{
+		Name: "root_parent_through_bridge",
+		Sides: []orm.RelSide{
+			{From: "root", To: "bridge", Modify: "from"},
+			{From: "bridge", To: "parent", Modify: "to"},
+		},
+	}
+
+	got := prepareFactoryParentRelationships(Relationships{
+		"root":        {rootParent, reverseToMany, reverseToOne, multiSide},
+		"parent":      {parentGrandparent},
+		"grandparent": {cycleClosing},
+	})
+	if len(got["root"]) != 0 {
+		t.Fatalf("lexically cycle-closing parent relationship retained: %#v", got["root"])
+	}
+	if len(got["parent"]) != 1 || got["parent"][0].Name != parentGrandparent.Name {
+		t.Fatalf("transitive parent relationship missing: %#v", got["parent"])
+	}
+	if len(got["grandparent"]) != 1 || got["grandparent"][0].Name != cycleClosing.Name {
+		t.Fatalf("lexically earlier parent relationship missing: %#v", got["grandparent"])
 	}
 }
 
