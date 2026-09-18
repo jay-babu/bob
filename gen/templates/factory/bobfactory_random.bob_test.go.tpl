@@ -16,10 +16,7 @@ var testDB bob.Transactor[bob.Tx]
 {{- range $table := .Tables}}
 {{- $tAlias := $.Aliases.Table $table.Key}}
   {{range $column := $table.Columns -}}
-    {{- if hasKey $doneTypes $column.Type}}{{continue}}{{end -}}
-    {{- $_ := set $doneTypes $column.Type nil -}}
-    {{- $typDef := $.Types.Index $column.Type -}}
-    {{range $depTyp := $typDef.DependsOn}}
+    {{range $depTyp := $.Types.DependencyClosure $column.Type}}
       {{- $_ := set $doneTypes $depTyp nil -}}
     {{end}}
   {{end -}}

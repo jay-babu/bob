@@ -72,6 +72,9 @@ func TestGenerateSplitFactoryOutputGeneratesShallowAndRelationshipVariants(t *te
 			t.Fatalf("shallow factory contains relationship/foreign dependency %q:\n%s", unwanted, shallow)
 		}
 	}
+	assertTransitiveRandomHelpers(t, readTestFile(t, filepath.Join(
+		output.OutFolder, "public", "child", "bobfactory_random.bob.go",
+	)))
 
 	shallowModels := filepath.Join(
 		filepath.Dir(data.ModelSplit.RootOutFolder),
@@ -103,6 +106,9 @@ func TestGenerateSplitFactoryOutputGeneratesShallowAndRelationshipVariants(t *te
 			t.Fatalf("relationship factory contains recursive self alias %q:\n%s", unwanted, relationship)
 		}
 	}
+	assertTransitiveRandomHelpers(t, readTestFile(t, filepath.Join(
+		output.OutFolder, "public", "child", "relationships", "bobfactory_random.bob.go",
+	)))
 
 	relationshipModels := readTestFile(t, filepath.Join(
 		filepath.Dir(data.ModelSplit.RootOutFolder),
@@ -171,6 +177,7 @@ func splitFactoryTestFixture(t *testing.T, factoryTemplates fs.FS) (Output, Temp
 			Columns: []drivers.Column{
 				{Name: "id", Type: "string"},
 				{Name: "parent_id", Type: "string"},
+				{Name: "payload", Type: "[][]byte"},
 			},
 			Constraints: drivers.Constraints[any]{
 				Primary: &drivers.Constraint[any]{Name: "child_pkey", Columns: []string{"id"}},
@@ -203,6 +210,14 @@ func splitFactoryTestFixture(t *testing.T, factoryTemplates fs.FS) (Output, Temp
 	types := drivers.Types{}
 	types.SetTypeModifier(drivers.AarondlNull{})
 	types.Register("string", drivers.Type{RandomExpr: `return "value"`})
+	types.Register("[]byte", drivers.Type{
+		DependsOn:  []string{"string"},
+		RandomExpr: `return []byte(random_string(f, limits...))`,
+	})
+	types.Register("[][]byte", drivers.Type{
+		DependsOn:  []string{"[]byte"},
+		RandomExpr: `return [][]byte{random___byte(f, limits...)}`,
+	})
 	types.Register("foreign.Type", drivers.Type{
 		Imports:    []string{`foreign "example.com/foreign"`},
 		RandomExpr: "return foreign.New()",
@@ -221,7 +236,7 @@ func splitFactoryTestFixture(t *testing.T, factoryTemplates fs.FS) (Output, Temp
 				UpSingular:    "Child",
 				DownPlural:    "children",
 				DownSingular:  "child",
-				Columns:       map[string]string{"id": "ID", "parent_id": "ParentID"},
+				Columns:       map[string]string{"id": "ID", "parent_id": "ParentID", "payload": "Payload"},
 				Relationships: map[string]string{"child_parent_fk": "Parent"},
 			},
 			"public.parent": {
@@ -289,6 +304,15 @@ func readTestFile(t *testing.T, path string) string {
 		t.Fatal(err)
 	}
 	return string(contents)
+}
+
+func assertTransitiveRandomHelpers(t *testing.T, generated string) {
+	t.Helper()
+	for _, helper := range []string{"func random___byte(", "func random_string("} {
+		if !strings.Contains(generated, helper) {
+			t.Fatalf("generated random helpers are missing transitive dependency %q:\n%s", helper, generated)
+		}
+	}
 }
 
 func TestCleanGeneratedSubdirectoriesPreservesHandwrittenFiles(t *testing.T) {

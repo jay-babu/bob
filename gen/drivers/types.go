@@ -124,6 +124,25 @@ func (t Types) Index(name string) Type {
 	return t.registered[name]
 }
 
+// DependencyClosure returns a type and every transitive type dependency once.
+func (t Types) DependencyClosure(name string) []string {
+	seen := make(map[string]struct{})
+	closure := make([]string, 0, 1)
+	var visit func(string)
+	visit = func(current string) {
+		if _, ok := seen[current]; ok {
+			return
+		}
+		seen[current] = struct{}{}
+		closure = append(closure, current)
+		for _, dependency := range t.Index(current).DependsOn {
+			visit(dependency)
+		}
+	}
+	visit(name)
+	return closure
+}
+
 func (t *Types) Register(name string, typedef Type) {
 	if t.registered == nil {
 		t.registered = make(map[string]Type)
