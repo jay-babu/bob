@@ -428,47 +428,6 @@ func generateSplitFactoryOutput[T, C, I any](o *Output, data *TemplateData[T, C,
 		}
 	}
 
-	parentRelationships := prepareFactoryParentRelationships(originalRelationships)
-	for _, originalComponent := range originalSplit.Components {
-		rootTableKey := originalComponent.TableKeys[0]
-		parentSplit, closureRelationships := buildFactoryParentsSplit(
-			originalSplit,
-			rootTableKey,
-			o.OutFolder,
-			factoryPackage,
-			parentRelationships,
-		)
-		component := parentSplit.Components[0]
-		componentOutput := *o
-		componentOutput.PkgName = component.Package
-		componentOutput.OutFolder = component.OutFolder
-		data.ModelSplit = parentSplit
-		data.Relationships = closureRelationships
-		componentModelsPackage, err := generateComponentFactoryModelsFacade(
-			factoryModelsFolder,
-			factoryModelsPackage,
-			originalSplit,
-			parentSplit,
-			component,
-			originalTables,
-			data,
-		)
-		if err != nil {
-			return fmt.Errorf("parent component %s factory models facade: %w", component.ID, err)
-		}
-		data.OutputPackages["models"] = componentModelsPackage
-		data.Tables = filterTablesForComponent(originalTables, component)
-		data.ModelSplit.Generation = modelSplitGenerationComponent
-		data.ModelSplit.CurrentComponent = component
-
-		if err := generateSingletonOutput(&componentOutput, data, generator, noTests); err != nil {
-			return fmt.Errorf("parent component %s singleton output: %w", component.ID, err)
-		}
-		if err := generateTableOutput(&componentOutput, data, generator, noTests); err != nil {
-			return fmt.Errorf("parent component %s table output: %w", component.ID, err)
-		}
-	}
-
 	return nil
 }
 
