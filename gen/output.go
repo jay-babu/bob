@@ -377,10 +377,12 @@ func generateSplitFactoryOutput[T, C, I any](o *Output, data *TemplateData[T, C,
 	passes := []struct {
 		split         *ModelSplitData
 		relationships Relationships
+		directModels  bool
 	}{
 		{
 			split:         modelSplitForOutput(originalSplit, o.OutFolder, factoryPackage),
 			relationships: nil,
+			directModels:  true,
 		},
 		{
 			split: modelSplitForNestedOutput(
@@ -402,17 +404,21 @@ func generateSplitFactoryOutput[T, C, I any](o *Output, data *TemplateData[T, C,
 			componentOutput := *o
 			componentOutput.PkgName = component.Package
 			componentOutput.OutFolder = component.OutFolder
-			componentModelsPackage, err := generateComponentFactoryModelsFacade(
-				factoryModelsFolder,
-				factoryModelsPackage,
-				originalSplit,
-				pass.split,
-				component,
-				originalTables,
-				data,
-			)
-			if err != nil {
-				return fmt.Errorf("component %s factory models facade: %w", component.ID, err)
+			componentModelsPackage := originalComponent.PackagePath
+			if !pass.directModels {
+				var err error
+				componentModelsPackage, err = generateComponentFactoryModelsFacade(
+					factoryModelsFolder,
+					factoryModelsPackage,
+					originalSplit,
+					pass.split,
+					component,
+					originalTables,
+					data,
+				)
+				if err != nil {
+					return fmt.Errorf("component %s factory models facade: %w", component.ID, err)
+				}
 			}
 			data.OutputPackages["models"] = componentModelsPackage
 			data.Tables = filterTablesForComponent(originalTables, component)

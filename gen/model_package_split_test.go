@@ -56,7 +56,7 @@ func TestGenerateSplitFactoryOutputGeneratesShallowAndRelationshipVariants(t *te
 		"func (o *ChildTemplate) Create(",
 		"func (o ChildTemplate) CreateMany(",
 		"func (m childMods) RandomizeAllColumns(",
-		`models "example.com/_factorymodels/public/child"`,
+		`models "example.com/bobmodels/public/child"`,
 	} {
 		if !strings.Contains(shallow, want) {
 			t.Fatalf("shallow factory missing %q:\n%s", want, shallow)
@@ -73,15 +73,12 @@ func TestGenerateSplitFactoryOutputGeneratesShallowAndRelationshipVariants(t *te
 		}
 	}
 
-	shallowModels := readTestFile(t, filepath.Join(
+	shallowModels := filepath.Join(
 		filepath.Dir(data.ModelSplit.RootOutFolder),
 		"_factorymodels", "public", "child", "bob_factory_models.bob.go",
-	))
-	if !strings.Contains(shallowModels, `child "example.com/bobmodels/public/child"`) {
-		t.Fatalf("shallow model facade is missing its own model:\n%s", shallowModels)
-	}
-	if strings.Contains(shallowModels, "example.com/bobmodels/public/parent") {
-		t.Fatalf("shallow model facade imports a foreign model:\n%s", shallowModels)
+	)
+	if _, err := os.Stat(shallowModels); !os.IsNotExist(err) {
+		t.Fatalf("shallow model facade should not be generated: %v", err)
 	}
 
 	relationship := readTestFile(t, filepath.Join(
@@ -403,6 +400,7 @@ func TestGenerateSplitFactoryOutputDoesNotGenerateRootPackage(t *testing.T) {
 		filepath.Join(factoryFolder, "marker.bob.go"),
 		filepath.Join(factoryFolder, "stale_root.bob.go"),
 		filepath.Join(factoryModelsFolder, "bob_factory_models.bob.go"),
+		filepath.Join(factoryModelsFolder, "public", "entity", "bob_factory_models.bob.go"),
 	} {
 		if _, err := os.Stat(file); !os.IsNotExist(err) {
 			t.Fatalf("root generated file still exists: %s: %v", file, err)
@@ -413,7 +411,7 @@ func TestGenerateSplitFactoryOutputDoesNotGenerateRootPackage(t *testing.T) {
 		filepath.Join(factoryModelsFolder, "custom.go"),
 		filepath.Join(factoryModelsFolder, "public", "entity", "custom_helpers.go"),
 		filepath.Join(factoryFolder, "public", "entity", "marker.bob.go"),
-		filepath.Join(factoryModelsFolder, "public", "entity", "bob_factory_models.bob.go"),
+		filepath.Join(factoryModelsFolder, "public", "entity", "relationships", "bob_factory_models.bob.go"),
 	} {
 		if _, err := os.Stat(file); err != nil {
 			t.Fatalf("expected file missing: %s: %v", file, err)
