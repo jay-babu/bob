@@ -2,6 +2,7 @@
 {{ $table := .Table}}
 {{ $tAlias := .Aliases.Table $table.Key -}}
 
+{{if $.FactoryRelationshipsEnabled -}}
 // setModelRels creates and sets the relationships on *models.{{$tAlias.UpSingular}}
 // according to the relationships in the template. Nothing is inserted into the db
 func (t {{$tAlias.UpSingular}}Template) setModelRels(o *models.{{$tAlias.UpSingular}}) {
@@ -53,6 +54,7 @@ func (t {{$tAlias.UpSingular}}Template) setModelRels(o *models.{{$tAlias.UpSingu
 
     {{end -}}
 }
+{{end}}
 
 {{if $table.Constraints.Primary -}}
 // BuildSetter returns an *models.{{$tAlias.UpSingular}}Setter
@@ -99,7 +101,9 @@ func (o {{$tAlias.UpSingular}}Template) Build() *models.{{$tAlias.UpSingular}} {
       }
   {{end}}
 
+	{{if $.FactoryRelationshipsEnabled -}}
 	o.setModelRels(m)
+	{{end -}}
 
 	return m
 }

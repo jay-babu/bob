@@ -2,15 +2,297 @@ package gen
 
 import (
 	"go/token"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
+	"testing/fstest"
 	"text/template"
 
 	"github.com/stephenafamo/bob/gen/drivers"
 	"github.com/stephenafamo/bob/orm"
 )
+
+func TestGenerateSplitFactoryOutputGeneratesShallowAndRelationshipVariants(t *testing.T) {
+	t.Parallel()
+
+	output, data := splitFactoryTestFixture(t, BaseTemplates.Factory)
+	staleRelationshipDir := filepath.Join(output.OutFolder, "public", "child", "relationships")
+	for file, contents := range map[string]string{
+		filepath.Join(staleRelationshipDir, "stale.bob.go"): "generated",
+		filepath.Join(staleRelationshipDir, "custom.go"):    "handwritten",
+	} {
+		if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(file, []byte(contents), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	originalTables := data.Tables
+	originalRelationships := data.Relationships
+	originalModelSplit := data.ModelSplit
+	originalModelsPackage := data.OutputPackages["models"]
+	originalPkgName := data.PkgName
+	originalTable := data.Table
+	originalCurrentPackage := data.CurrentPackage
+	originalImporter := data.Importer
+	originalLanguage := data.Language
+
+	if err := generateSplitFactoryOutput(&output, &data, "BobGen", true); err != nil {
+		t.Fatal(err)
+	}
+	assertSplitFactoryTemplateState(t, data, originalTables, originalRelationships, originalModelSplit,
+		originalModelsPackage, originalPkgName, originalTable, originalCurrentPackage, originalImporter, originalLanguage)
+
+	shallow := readTestFile(t, filepath.Join(output.OutFolder, "public", "child", "public.child.bob.go"))
+	for _, want := range []string{
+		"func NewChildWithContext",
+		"func FromExistingChild",
+		"func (o ChildTemplate) Build()",
+		"func (o *ChildTemplate) Create(",
+		"func (o ChildTemplate) CreateMany(",
+		"func (m childMods) RandomizeAllColumns(",
+		`models "example.com/_factorymodels/public/child"`,
+	} {
+		if !strings.Contains(shallow, want) {
+			t.Fatalf("shallow factory missing %q:\n%s", want, shallow)
+		}
+	}
+	for _, unwanted := range []string{
+		"WithParent",
+		"childR struct",
+		"example.com/_factory_test/public/parent",
+		"example.com/foreign",
+	} {
+		if strings.Contains(shallow, unwanted) {
+			t.Fatalf("shallow factory contains relationship/foreign dependency %q:\n%s", unwanted, shallow)
+		}
+	}
+
+	shallowModels := readTestFile(t, filepath.Join(
+		filepath.Dir(data.ModelSplit.RootOutFolder),
+		"_factorymodels", "public", "child", "bob_factory_models.bob.go",
+	))
+	if !strings.Contains(shallowModels, `child "example.com/bobmodels/public/child"`) {
+		t.Fatalf("shallow model facade is missing its own model:\n%s", shallowModels)
+	}
+	if strings.Contains(shallowModels, "example.com/bobmodels/public/parent") {
+		t.Fatalf("shallow model facade imports a foreign model:\n%s", shallowModels)
+	}
+
+	relationship := readTestFile(t, filepath.Join(
+		output.OutFolder, "public", "child", "relationships", "public.child.bob.go",
+	))
+	for _, want := range []string{
+		"func NewChildWithContext",
+		"func FromExistingChild",
+		"WithParent",
+		"example.com/_factory_test/public/parent/relationships",
+		`models "example.com/_factorymodels/public/child/relationships"`,
+	} {
+		if !strings.Contains(relationship, want) {
+			t.Fatalf("relationship factory missing %q:\n%s", want, relationship)
+		}
+	}
+	for _, unwanted := range []string{
+		"type ChildTemplate = ChildTemplate",
+		"var ChildMods = ChildMods",
+	} {
+		if strings.Contains(relationship, unwanted) {
+			t.Fatalf("relationship factory contains recursive self alias %q:\n%s", unwanted, relationship)
+		}
+	}
+
+	relationshipModels := readTestFile(t, filepath.Join(
+		filepath.Dir(data.ModelSplit.RootOutFolder),
+		"_factorymodels", "public", "child", "relationships", "bob_factory_models.bob.go",
+	))
+	for _, want := range []string{
+		`child "example.com/bobmodels/public/child"`,
+		`parent "example.com/bobmodels/public/parent"`,
+	} {
+		if !strings.Contains(relationshipModels, want) {
+			t.Fatalf("relationship model facade missing closure import %q:\n%s", want, relationshipModels)
+		}
+	}
+
+	if _, err := os.Stat(filepath.Join(staleRelationshipDir, "stale.bob.go")); !os.IsNotExist(err) {
+		t.Fatalf("stale nested generated file still exists: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(staleRelationshipDir, "custom.go")); err != nil {
+		t.Fatalf("nested handwritten file was removed: %v", err)
+	}
+}
+
+func TestGenerateSplitFactoryOutputRestoresTemplateStateAfterError(t *testing.T) {
+	t.Parallel()
+
+	templates := fstest.MapFS{
+		"marker.bob.go.tpl": &fstest.MapFile{Data: []byte("const Generated = true\n")},
+		"table/fail.go.tpl": &fstest.MapFile{Data: []byte(`
+{{if $.Relationships.Get .Table.Key}}{{fail "forced relationship generation failure"}}{{end}}
+const TableGenerated = true
+`)},
+	}
+	output, data := splitFactoryTestFixture(t, templates)
+	originalTables := data.Tables
+	originalRelationships := data.Relationships
+	originalModelSplit := data.ModelSplit
+	originalModelsPackage := data.OutputPackages["models"]
+	originalPkgName := data.PkgName
+	originalTable := data.Table
+	originalCurrentPackage := data.CurrentPackage
+	originalImporter := data.Importer
+	originalLanguage := data.Language
+
+	err := generateSplitFactoryOutput(&output, &data, "BobGen", true)
+	if err == nil || !strings.Contains(err.Error(), "forced relationship generation failure") {
+		t.Fatalf("expected forced relationship generation failure, got %v", err)
+	}
+	assertSplitFactoryTemplateState(t, data, originalTables, originalRelationships, originalModelSplit,
+		originalModelsPackage, originalPkgName, originalTable, originalCurrentPackage, originalImporter, originalLanguage)
+}
+
+func splitFactoryTestFixture(t *testing.T, factoryTemplates fs.FS) (Output, TemplateData[any, any, any]) {
+	t.Helper()
+
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com\n\ngo 1.26\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	modelsFolder := filepath.Join(root, "bobmodels")
+	factoryFolder := filepath.Join(root, "_factory_test")
+	tables := drivers.Tables[any, any]{
+		{
+			Key:    "public.child",
+			Schema: "public",
+			Name:   "child",
+			Columns: []drivers.Column{
+				{Name: "id", Type: "string"},
+				{Name: "parent_id", Type: "string"},
+			},
+			Constraints: drivers.Constraints[any]{
+				Primary: &drivers.Constraint[any]{Name: "child_pkey", Columns: []string{"id"}},
+				Foreign: []drivers.ForeignKey[any]{{
+					Constraint:     drivers.Constraint[any]{Name: "child_parent_fk", Columns: []string{"parent_id"}},
+					ForeignTable:   "public.parent",
+					ForeignColumns: []string{"id"},
+				}},
+			},
+		},
+		{
+			Key:    "public.parent",
+			Schema: "public",
+			Name:   "parent",
+			Columns: []drivers.Column{
+				{Name: "id", Type: "string"},
+				{Name: "foreign_only", Type: "foreign.Type"},
+			},
+			Constraints: drivers.Constraints[any]{
+				Primary: &drivers.Constraint[any]{Name: "parent_pkey", Columns: []string{"id"}},
+			},
+		},
+	}
+	relationships := buildRelationships(tables)
+	if err := initRelationships(relationships, tables); err != nil {
+		t.Fatal(err)
+	}
+	relationships = prepareTablePackageRelationships(relationships)
+
+	types := drivers.Types{}
+	types.SetTypeModifier(drivers.AarondlNull{})
+	types.Register("string", drivers.Type{RandomExpr: `return "value"`})
+	types.Register("foreign.Type", drivers.Type{
+		Imports:    []string{`foreign "example.com/foreign"`},
+		RandomExpr: "return foreign.New()",
+	})
+
+	modelSplit := buildModelSplitData(modelsFolder, "example.com/bobmodels", tables)
+	data := TemplateData[any, any, any]{
+		Table:         drivers.Table[any, any]{Key: "sentinel"},
+		Tables:        tables,
+		AllTables:     tables,
+		Types:         types,
+		Relationships: relationships,
+		Aliases: drivers.Aliases{
+			"public.child": {
+				UpPlural:      "Children",
+				UpSingular:    "Child",
+				DownPlural:    "children",
+				DownSingular:  "child",
+				Columns:       map[string]string{"id": "ID", "parent_id": "ParentID"},
+				Relationships: map[string]string{"child_parent_fk": "Parent"},
+			},
+			"public.parent": {
+				UpPlural:      "Parents",
+				UpSingular:    "Parent",
+				DownPlural:    "parents",
+				DownSingular:  "parent",
+				Columns:       map[string]string{"id": "ID", "foreign_only": "ForeignOnly"},
+				Relationships: map[string]string{"child_parent_fk": "Children"},
+			},
+		},
+		PkgName:            "sentinelpkg",
+		CurrentPackage:     "example.com/sentinel",
+		OutputPackages:     map[string]string{"models": "example.com/bobmodels", "factory": "example.com/_factory_test"},
+		ModelSplit:         modelSplit,
+		RelationLoadedName: "Loaded",
+		Driver:             "database/sql",
+	}
+	output := Output{
+		Key:       "factory",
+		PkgName:   "factory_test",
+		OutFolder: factoryFolder,
+		Templates: []fs.FS{factoryTemplates},
+	}
+	if err := output.initTemplates(nil); err != nil {
+		t.Fatal(err)
+	}
+
+	return output, data
+}
+
+func assertSplitFactoryTemplateState(
+	t *testing.T,
+	data TemplateData[any, any, any],
+	tables drivers.Tables[any, any],
+	relationships Relationships,
+	modelSplit *ModelSplitData,
+	modelsPackage string,
+	pkgName string,
+	table drivers.Table[any, any],
+	currentPackage string,
+	importer any,
+	language any,
+) {
+	t.Helper()
+
+	if !reflect.DeepEqual(data.Tables, tables) || !reflect.DeepEqual(data.Relationships, relationships) {
+		t.Fatal("split factory generation did not restore tables and relationships")
+	}
+	if data.ModelSplit != modelSplit || data.OutputPackages["models"] != modelsPackage {
+		t.Fatal("split factory generation did not restore split/package state")
+	}
+	if data.PkgName != pkgName || !reflect.DeepEqual(data.Table, table) || data.CurrentPackage != currentPackage {
+		t.Fatal("split factory generation did not restore current template state")
+	}
+	if !reflect.DeepEqual(data.Importer, importer) || !reflect.DeepEqual(data.Language, language) {
+		t.Fatal("split factory generation did not restore language state")
+	}
+}
+
+func readTestFile(t *testing.T, path string) string {
+	t.Helper()
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(contents)
+}
 
 func TestCleanGeneratedSubdirectoriesPreservesHandwrittenFiles(t *testing.T) {
 	t.Parallel()
@@ -150,6 +432,28 @@ func TestFactoryPackageUsesScopedTablePackage(t *testing.T) {
 
 	if got, want := data.FactoryPackage("public.entity"), "example.com/_factory_test/public/entity"; got != want {
 		t.Fatalf("factory package: want %q, got %q", want, got)
+	}
+}
+
+func TestFactoryRelationshipsPackageUsesOptInPackage(t *testing.T) {
+	t.Parallel()
+
+	tables := drivers.Tables[any, any]{{Key: "public.entity", Name: "entity"}}
+	data := TemplateData[any, any, any]{
+		OutputPackages: map[string]string{"factory": "example.com/_factory_test"},
+		ModelSplit:     buildModelSplitData("/tmp/models", "example.com/models", tables),
+	}
+
+	if got, want := data.FactoryRelationshipsPackage("public.entity"), "example.com/_factory_test/public/entity/relationships"; got != want {
+		t.Fatalf("relationship factory package: want %q, got %q", want, got)
+	}
+	if got, want := data.FactoryRelationshipsPackage("public.unknown"), "example.com/_factory_test"; got != want {
+		t.Fatalf("unknown relationship factory package: want %q, got %q", want, got)
+	}
+
+	data.ModelSplit = nil
+	if got, want := data.FactoryRelationshipsPackage("public.entity"), "example.com/_factory_test"; got != want {
+		t.Fatalf("non-split relationship factory package: want %q, got %q", want, got)
 	}
 }
 

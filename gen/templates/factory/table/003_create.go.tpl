@@ -48,6 +48,7 @@ func ensureCreatable{{$tAlias.UpSingular}}(m *models.{{$tAlias.UpSingular}}Sette
   return nil
 }
 
+{{if $.FactoryRelationshipsEnabled -}}
 // insertOptRels creates and inserts any optional the relationships on *models.{{$tAlias.UpSingular}}
 // according to the relationships in the template. 
 // any required relationship should have already exist on the model
@@ -137,6 +138,7 @@ func (o *{{$tAlias.UpSingular}}Template) insertOptRels(ctx context.Context, exec
 
 	return err
 }
+{{end}}
 
 
 // Create builds a {{$tAlias.DownSingular}} and inserts it into the database
@@ -145,6 +147,7 @@ func (o *{{$tAlias.UpSingular}}Template) Create(ctx context.Context, exec bob.Ex
 	var err error
 	opt := o.BuildSetter();
 
+	{{if $.FactoryRelationshipsEnabled -}}
 	// Retrieve ancestor models from context to avoid duplicate parent creation.
 	// Parents are keyed by "parent_table:child_table:child_rel_name".
 	mInCreation, _ := modelsInCreationCtx.Value(ctx)
@@ -232,6 +235,7 @@ func (o *{{$tAlias.UpSingular}}Template) Create(ctx context.Context, exec bob.Ex
 			{{- end}}
 		}
 	{{end}}
+	{{end -}}
 
 	if err = ensureCreatable{{$tAlias.UpSingular}}(opt, o.requireAll); err != nil {
 		return nil, err
@@ -242,6 +246,7 @@ func (o *{{$tAlias.UpSingular}}Template) Create(ctx context.Context, exec bob.Ex
 	  return nil, err
 	}
 
+  {{if $.FactoryRelationshipsEnabled -}}
   // Store this model in context for child creates.
   // Key format: "parent_table:child_table:child_rel_name" where child_rel_name is the FK name.
   newMInCreation := make(map[string]any, len(mInCreation)+1)
@@ -269,6 +274,7 @@ func (o *{{$tAlias.UpSingular}}Template) Create(ctx context.Context, exec bob.Ex
   if err := o.insertOptRels(ctx, exec, m); err != nil {
     return nil, err
   }
+  {{end -}}
 	return m, err
 }
 

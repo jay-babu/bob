@@ -328,14 +328,26 @@ func generateSplitFactoryOutput[T, C, I any](o *Output, data *TemplateData[T, C,
 		return generateTableOutput(o, data, generator, noTests)
 	}
 
+	originalTable := data.Table
 	originalTables := data.Tables
-	originalPkgName := o.PkgName
+	originalRelationships := data.Relationships
+	originalPkgName := data.PkgName
+	originalCurrentPackage := data.CurrentPackage
+	originalImporter := data.Importer
+	originalLanguage := data.Language
+	originalOutputPkgName := o.PkgName
 	originalOutFolder := o.OutFolder
 	originalSplit := data.ModelSplit
 	originalModelsPackage := data.OutputPackages["models"]
 	defer func() {
+		data.Table = originalTable
 		data.Tables = originalTables
-		o.PkgName = originalPkgName
+		data.Relationships = originalRelationships
+		data.PkgName = originalPkgName
+		data.CurrentPackage = originalCurrentPackage
+		data.Importer = originalImporter
+		data.Language = originalLanguage
+		o.PkgName = originalOutputPkgName
 		o.OutFolder = originalOutFolder
 		data.ModelSplit = originalSplit
 		data.OutputPackages["models"] = originalModelsPackage
@@ -350,46 +362,69 @@ func generateSplitFactoryOutput[T, C, I any](o *Output, data *TemplateData[T, C,
 		return fmt.Errorf("cleaning old factory models output: %w", err)
 	}
 
-	factorySplit := modelSplitForOutput(originalSplit, o.OutFolder, data.OutputPackages[o.Key])
-	data.ModelSplit = factorySplit
-
 	if err := o.initOutFolders(); err != nil {
 		return fmt.Errorf("unable to initialize root factory output folder: %w", err)
 	}
-	if factorySplit.Mode == modelPackageSplitModeTablePackages {
+	if originalSplit.Mode == modelPackageSplitModeTablePackages {
 		if err := cleanGeneratedSubdirectories(o.OutFolder); err != nil {
 			return fmt.Errorf("cleaning old schema/table factory output: %w", err)
 		}
-	} else if err := os.RemoveAll(filepath.Join(o.OutFolder, filepath.FromSlash(factorySplit.InternalDir))); err != nil {
+	} else if err := os.RemoveAll(filepath.Join(o.OutFolder, filepath.FromSlash(originalSplit.InternalDir))); err != nil {
 		return fmt.Errorf("removing old split factory output: %w", err)
 	}
 
-	for _, component := range data.ModelSplit.Components {
-		componentOutput := *o
-		componentOutput.PkgName = component.Package
-		componentOutput.OutFolder = component.OutFolder
-		componentModelsPackage, err := generateComponentFactoryModelsFacade(
-			factoryModelsFolder,
-			factoryModelsPackage,
-			originalSplit,
-			factorySplit,
-			component,
-			originalTables,
-			data,
-		)
-		if err != nil {
-			return fmt.Errorf("component %s factory models facade: %w", component.ID, err)
-		}
-		data.OutputPackages["models"] = componentModelsPackage
-		data.Tables = filterTablesForComponent(originalTables, component)
-		data.ModelSplit.Generation = modelSplitGenerationComponent
-		data.ModelSplit.CurrentComponent = component
+	factoryPackage := data.OutputPackages[o.Key]
+	passes := []struct {
+		split         *ModelSplitData
+		relationships Relationships
+	}{
+		{
+			split:         modelSplitForOutput(originalSplit, o.OutFolder, factoryPackage),
+			relationships: nil,
+		},
+		{
+			split: modelSplitForNestedOutput(
+				originalSplit,
+				o.OutFolder,
+				factoryPackage,
+				factoryRelationshipsPackage,
+			),
+			relationships: originalRelationships,
+		},
+	}
 
-		if err := generateSingletonOutput(&componentOutput, data, generator, noTests); err != nil {
-			return fmt.Errorf("component %s singleton output: %w", component.ID, err)
-		}
-		if err := generateTableOutput(&componentOutput, data, generator, noTests); err != nil {
-			return fmt.Errorf("component %s table output: %w", component.ID, err)
+	for _, pass := range passes {
+		data.ModelSplit = pass.split
+		data.Relationships = pass.relationships
+
+		for _, originalComponent := range originalSplit.Components {
+			component := pass.split.TableComponents[originalComponent.TableKeys[0]]
+			componentOutput := *o
+			componentOutput.PkgName = component.Package
+			componentOutput.OutFolder = component.OutFolder
+			componentModelsPackage, err := generateComponentFactoryModelsFacade(
+				factoryModelsFolder,
+				factoryModelsPackage,
+				originalSplit,
+				pass.split,
+				component,
+				originalTables,
+				data,
+			)
+			if err != nil {
+				return fmt.Errorf("component %s factory models facade: %w", component.ID, err)
+			}
+			data.OutputPackages["models"] = componentModelsPackage
+			data.Tables = filterTablesForComponent(originalTables, component)
+			data.ModelSplit.Generation = modelSplitGenerationComponent
+			data.ModelSplit.CurrentComponent = component
+
+			if err := generateSingletonOutput(&componentOutput, data, generator, noTests); err != nil {
+				return fmt.Errorf("component %s singleton output: %w", component.ID, err)
+			}
+			if err := generateTableOutput(&componentOutput, data, generator, noTests); err != nil {
+				return fmt.Errorf("component %s table output: %w", component.ID, err)
+			}
 		}
 	}
 
@@ -437,9 +472,6 @@ func generateFactoryModelsFacade[T, C, I any](
 	data *TemplateData[T, C, I],
 ) error {
 	if err := os.MkdirAll(outFolder, os.ModePerm); err != nil {
-		return err
-	}
-	if err := cleanGeneratedSubdirectories(outFolder); err != nil {
 		return err
 	}
 

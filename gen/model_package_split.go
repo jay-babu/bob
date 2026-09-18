@@ -16,6 +16,7 @@ import (
 
 const (
 	modelPackageSplitModeTablePackages = "table_packages"
+	factoryRelationshipsPackage        = "relationships"
 
 	modelSplitGenerationFacade    = "facade"
 	modelSplitGenerationComponent = "component"
@@ -284,6 +285,30 @@ func modelSplitForOutput(split *ModelSplitData, rootOutFolder, rootPackagePath s
 		}
 		for _, tableKey := range c.TableKeys {
 			clone.TableComponents[tableKey] = c
+		}
+	}
+
+	return clone
+}
+
+func modelSplitForNestedOutput(split *ModelSplitData, rootOutFolder, rootPackagePath, nestedPackage string) *ModelSplitData {
+	clone := modelSplitForOutput(split, rootOutFolder, rootPackagePath)
+	if clone == nil || !clone.Enabled {
+		return clone
+	}
+
+	aliasCounts := make(map[string]int, len(clone.Components))
+	for _, component := range clone.Components {
+		component.Package = safeGoPackageName(nestedPackage)
+		component.ImportAlias = safeGoPackageName(component.ImportAlias + nestedPackage)
+		aliasCounts[component.ImportAlias]++
+		component.RelativePath = path.Join(component.RelativePath, nestedPackage)
+		component.OutFolder = filepath.Join(rootOutFolder, filepath.FromSlash(component.RelativePath))
+		component.PackagePath = path.Join(rootPackagePath, component.RelativePath)
+	}
+	for _, component := range clone.Components {
+		if aliasCounts[component.ImportAlias] > 1 {
+			component.ImportAlias += stableModelComponentID(component.TableKeys)[:8]
 		}
 	}
 

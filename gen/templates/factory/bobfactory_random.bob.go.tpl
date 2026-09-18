@@ -7,7 +7,7 @@
 var defaultFaker = faker.New()
 
 {{$doneTypes := dict }}
-{{- range $table := .AllTables}}
+{{- range $table := .Tables}}
 {{- $tAlias := $.Aliases.Table $table.Key}}
   {{range $column := $table.Columns -}}
     {{- if hasKey $doneTypes $column.Type}}{{continue}}{{end -}}
