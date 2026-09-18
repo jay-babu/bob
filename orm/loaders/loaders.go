@@ -12,7 +12,7 @@ import (
 	"github.com/stephenafamo/bob/orm"
 )
 
-func ThenLoadBuilder[Q orm.Loadable, T any, S any](name string, f func(context.Context, bob.Executor, T, ...bob.Mod[S]) error) func(...bob.Mod[S]) orm.Loader[Q] {
+func ThenLoadBuilder[Q orm.Loadable, T, S any](name string, f func(context.Context, bob.Executor, T, ...bob.Mod[S]) error) func(...bob.Mod[S]) orm.Loader[Q] {
 	return func(queryMods ...bob.Mod[S]) orm.Loader[Q] {
 		return func(ctx context.Context, exec bob.Executor, retrieved any) error {
 			loader, isLoader := retrieved.(T)
