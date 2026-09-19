@@ -194,6 +194,15 @@ func (d *TemplateData[T, C, I]) FactoryPackage(tableKey string) string {
 	return path.Join(root, component.RelativePath)
 }
 
+func (d *TemplateData[T, C, I]) FactoryRelationshipsPackage(tableKey string) string {
+	factoryPackage := d.FactoryPackage(tableKey)
+	if factoryPackage == "" || d.ModelSplit == nil || !d.ModelSplit.Enabled || d.ModelSplit.TableComponents[tableKey] == nil {
+		return factoryPackage
+	}
+
+	return path.Join(factoryPackage, "relationships")
+}
+
 func (d *TemplateData[T, C, I]) IsModelSplitFacade() bool {
 	return d.ModelSplit != nil && d.ModelSplit.Enabled && d.ModelSplit.Generation == modelSplitGenerationFacade
 }
@@ -206,6 +215,10 @@ func (d *TemplateData[T, C, I]) UsesTablePackages() bool {
 func (d *TemplateData[T, C, I]) IsTablePackage() bool {
 	return d.UsesTablePackages() &&
 		d.ModelSplit.Generation == modelSplitGenerationComponent
+}
+
+func (d *TemplateData[T, C, I]) FactoryRelationshipsEnabled() bool {
+	return !d.IsTablePackage() || d.Relationships != nil
 }
 
 func (d *TemplateData[T, C, I]) HasExpandThenLoader(tableKey string) bool {

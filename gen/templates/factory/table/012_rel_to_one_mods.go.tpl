@@ -1,3 +1,4 @@
+{{if $.FactoryRelationshipsEnabled -}}
 {{$table := .Table}}
 {{ $tAlias := .Aliases.Table $table.Key -}}
 
@@ -76,4 +77,5 @@ func (m {{$tAlias.DownSingular}}Mods) Without{{$relAlias}}() {{$tAlias.UpSingula
 	})
 }
 
+{{end}}
 {{end}}
