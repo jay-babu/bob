@@ -1,6 +1,6 @@
 {{- $isSplit := and $.ModelSplit $.ModelSplit.Enabled -}}
 {{- $isFacade := and $isSplit (eq $.ModelSplit.Generation "facade") -}}
-{{- if not $isFacade -}}
+{{- if and (not $isFacade) $.FactoryRelationshipsEnabled -}}
 {{$.Importer.Import "context"}}
 
 type contextKey string

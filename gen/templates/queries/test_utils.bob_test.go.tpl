@@ -93,10 +93,7 @@ var defaultFaker = faker.New()
 
 {{$doneTypes := dict }}
 {{range $colTyp := $.QueryFolder.Types -}}
-  {{- if hasKey $doneTypes $colTyp}}{{continue}}{{end -}}
-  {{- $_ := set $doneTypes $colTyp nil -}}
-  {{- $typDef := $.Types.Index $colTyp -}}
-  {{range $depTyp := $typDef.DependsOn}}
+  {{range $depTyp := $.Types.DependencyClosure $colTyp}}
     {{- $_ := set $doneTypes $depTyp nil -}}
   {{end}}
 {{end -}}
