@@ -9,7 +9,6 @@ import (
 	"go/printer"
 	"go/token"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -49,36 +48,38 @@ func main() {
 func genDialect(path string) {
 	fset := token.NewFileSet() // positions are relative to fset
 
-	// Parse src but stop after processing the imports.
-	dir, err := parser.ParseDir(fset, path, func(fi fs.FileInfo) bool {
-		return rgxExampleFiles.MatchString(fi.Name())
-	}, parser.AllErrors)
+	files, err := os.ReadDir(path)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-
-	for dirName, pkg := range dir {
-		fmt.Printf("Dirname: %s\n", dirName)
-		for fileName, f := range pkg.Files {
-			fmt.Printf("filename: %s\n", fileName)
-			fileparts := strings.Split(fileName, "/")
-			if len(fileparts) != 3 {
-				fmt.Printf("skipping: %s\n", fileName)
-				continue
-			}
-
-			// replace _test.go with .md
-			baseName := strings.ReplaceAll(fileparts[len(fileparts)-1], "_test.go", ".md")
-
-			// replace "dialect/" with "docs/query-builder" and drop the basename
-			fileparts = append([]string{"website", "docs", "query-builder"}, fileparts[1:len(fileparts)-1]...)
-
-			// rejoin the file parts and add the basename and examples folder
-			examplesFileName := filepath.Join(append(fileparts, "examples", baseName)...)
-
-			ast.Walk(wrapVisitor{next: &topVisitor{fset: fset, destination: examplesFileName}}, f)
+	for _, file := range files {
+		if file.IsDir() || !rgxExampleFiles.MatchString(file.Name()) {
+			continue
 		}
+		fileName := filepath.Join(path, file.Name())
+		f, err := parser.ParseFile(fset, fileName, nil, parser.AllErrors)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		fmt.Printf("filename: %s\n", fileName)
+		fileparts := strings.Split(fileName, "/")
+		if len(fileparts) != 3 {
+			fmt.Printf("skipping: %s\n", fileName)
+			continue
+		}
+
+		// replace _test.go with .md
+		baseName := strings.ReplaceAll(fileparts[len(fileparts)-1], "_test.go", ".md")
+
+		// replace "dialect/" with "docs/query-builder" and drop the basename
+		fileparts = append([]string{"website", "docs", "query-builder"}, fileparts[1:len(fileparts)-1]...)
+
+		// rejoin the file parts and add the basename and examples folder
+		examplesFileName := filepath.Join(append(fileparts, "examples", baseName)...)
+
+		ast.Walk(wrapVisitor{next: &topVisitor{fset: fset, destination: examplesFileName}}, f)
 	}
 }
 
