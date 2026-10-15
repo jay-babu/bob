@@ -1,10 +1,9 @@
 package types
 
 import (
-	"bytes"
 	"database/sql/driver"
 	"encoding"
-	"encoding/json"
+	"encoding/json/v2"
 	"fmt"
 	"reflect"
 
@@ -56,7 +55,7 @@ func (j *JSON[T]) Scan(value any) error {
 	// Destinations are reused across rows. Decode separately to avoid mutating
 	// pointers and slices already copied into previously scanned values.
 	var decoded T
-	if err := json.NewDecoder(bytes.NewReader(data)).Decode(&decoded); err != nil {
+	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	j.Val = decoded
