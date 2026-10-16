@@ -389,3 +389,30 @@ func (t *Table[T, Tslice, Tset, C]) uniqueColNames(i int) []bob.Expression {
 
 	return colNames
 }
+
+// OneContext is One using the executor attached to ctx with bob.WithExecutor.
+func (t *insertQuery[T, Ts, Tset, C]) OneContext(ctx context.Context) (T, error) {
+	exec, err := bob.ExecutorFromContext(ctx)
+	if err != nil {
+		return *new(T), err
+	}
+	return t.One(ctx, exec)
+}
+
+// AllContext is All using the executor attached to ctx with bob.WithExecutor.
+func (t *insertQuery[T, Ts, Tset, C]) AllContext(ctx context.Context) (Ts, error) {
+	exec, err := bob.ExecutorFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return t.All(ctx, exec)
+}
+
+// CursorContext is Cursor using the executor attached to ctx with bob.WithExecutor.
+func (t *insertQuery[T, Ts, Tset, C]) CursorContext(ctx context.Context) (scan.ICursor[T], error) {
+	exec, err := bob.ExecutorFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return t.Cursor(ctx, exec)
+}

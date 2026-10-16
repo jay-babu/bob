@@ -274,3 +274,13 @@ func (b BoundQuery[E]) GetMapperMods() []scan.MapperMod {
 
 	return nil
 }
+
+// ExecContext executes the query using the executor attached to ctx with WithExecutor.
+func (b BaseQuery[E]) ExecContext(ctx context.Context) (sql.Result, error) {
+	return ExecContext(ctx, b)
+}
+
+// ExecContext executes the query using the executor attached to ctx with WithExecutor.
+func (b BoundQuery[E]) ExecContext(ctx context.Context) (sql.Result, error) {
+	return ExecContext(ctx, b)
+}
