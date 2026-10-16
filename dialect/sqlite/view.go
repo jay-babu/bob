@@ -191,3 +191,21 @@ func asCountQuery(query bob.BaseQuery[*dialect.SelectQuery]) bob.BaseQuery[*dial
 
 	return countQuery
 }
+
+// CountContext is Count using the executor attached to ctx with bob.WithExecutor.
+func (v *ViewQuery[T, Tslice]) CountContext(ctx context.Context) (int64, error) {
+	exec, err := bob.ExecutorFromContext(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return v.Count(ctx, exec)
+}
+
+// ExistsContext is Exists using the executor attached to ctx with bob.WithExecutor.
+func (v *ViewQuery[T, Tslice]) ExistsContext(ctx context.Context) (bool, error) {
+	exec, err := bob.ExecutorFromContext(ctx)
+	if err != nil {
+		return false, err
+	}
+	return v.Exists(ctx, exec)
+}

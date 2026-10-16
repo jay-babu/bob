@@ -233,3 +233,93 @@ func ArgsToExpression(querySQL string, from, to int, argIter iter.Seq[ArgWithPos
 		return args, nil
 	})
 }
+
+// ExecContext is Exec using the executor attached to ctx with bob.WithExecutor.
+func (q ExecQuery[Q]) ExecContext(ctx context.Context) (int64, error) {
+	exec, err := bob.ExecutorFromContext(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return q.Exec(ctx, exec)
+}
+
+// OneContext is One using the executor attached to ctx with bob.WithExecutor.
+func (q Query[Q, T, Ts, Tr]) OneContext(ctx context.Context) (T, error) {
+	exec, err := bob.ExecutorFromContext(ctx)
+	if err != nil {
+		return *new(T), err
+	}
+	return q.One(ctx, exec)
+}
+
+// AllContext is All using the executor attached to ctx with bob.WithExecutor.
+func (q Query[Q, T, Ts, Tr]) AllContext(ctx context.Context) (Ts, error) {
+	exec, err := bob.ExecutorFromContext(ctx)
+	if err != nil {
+		return *new(Ts), err
+	}
+	return q.All(ctx, exec)
+}
+
+// CursorContext is Cursor using the executor attached to ctx with bob.WithExecutor.
+func (q Query[Q, T, Ts, Tr]) CursorContext(ctx context.Context) (scan.ICursor[T], error) {
+	exec, err := bob.ExecutorFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return q.Cursor(ctx, exec)
+}
+
+// EachContext is Each using the executor attached to ctx with bob.WithExecutor.
+func (q Query[Q, T, Ts, Tr]) EachContext(ctx context.Context) (func(func(T, error) bool), error) {
+	exec, err := bob.ExecutorFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return q.Each(ctx, exec)
+}
+
+// ExecContext is Exec using the executor attached to ctx with bob.WithExecutor.
+func (q ModelQuery[Q, T, Ts]) ExecContext(ctx context.Context) (int64, error) {
+	exec, err := bob.ExecutorFromContext(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return q.Exec(ctx, exec)
+}
+
+// OneContext is One using the executor attached to ctx with bob.WithExecutor.
+func (q ModelQuery[Q, T, Ts]) OneContext(ctx context.Context) (T, error) {
+	exec, err := bob.ExecutorFromContext(ctx)
+	if err != nil {
+		return *new(T), err
+	}
+	return q.One(ctx, exec)
+}
+
+// AllContext is All using the executor attached to ctx with bob.WithExecutor.
+func (q ModelQuery[Q, T, Ts]) AllContext(ctx context.Context) (Ts, error) {
+	exec, err := bob.ExecutorFromContext(ctx)
+	if err != nil {
+		return *new(Ts), err
+	}
+	return q.All(ctx, exec)
+}
+
+// CursorContext is Cursor using the executor attached to ctx with bob.WithExecutor.
+func (q ModelQuery[Q, T, Ts]) CursorContext(ctx context.Context) (scan.ICursor[T], error) {
+	exec, err := bob.ExecutorFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return q.Cursor(ctx, exec)
+}
+
+// EachContext is Each using the executor attached to ctx with bob.WithExecutor.
+func (q ModelQuery[Q, T, Ts]) EachContext(ctx context.Context) (func(func(T, error) bool), error) {
+	exec, err := bob.ExecutorFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return q.Each(ctx, exec)
+}
