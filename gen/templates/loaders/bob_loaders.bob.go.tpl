@@ -1,14 +1,14 @@
-{{$.Importer.Import "fmt"}}
-{{$.Importer.Import "errors"}}
-{{$.Importer.Import "context"}}
-{{$.Importer.Import "database/sql"}}
-{{$.Importer.Import "sort"}}
-{{$.Importer.Import "strings"}}
-{{$.Importer.Import "github.com/stephenafamo/bob"}}
-{{$.Importer.Import "github.com/stephenafamo/bob/orm"}}
-{{if $.IsModelSplitFacade}}{{$.Importer.Import (printf "github.com/stephenafamo/bob/dialect/%s" $.Dialect)}}{{end}}
-{{$.Importer.Import (printf "github.com/stephenafamo/bob/dialect/%s/dialect" $.Dialect)}}
 {{$table := index .Tables 0 -}}
+{{$anyRels := false -}}
+{{range $t := .Tables}}{{if $.Relationships.Get $t.Key}}{{$anyRels = true}}{{end}}{{end -}}
+{{if or (not $.IsTablePackage) $.IsModelSplitFacade}}{{$.Importer.Import "github.com/stephenafamo/bob/orm"}}{{end}}
+{{if and $.IsModelSplitFacade $anyRels -}}
+{{$.Importer.Import "fmt"}}
+{{$.Importer.Import "github.com/stephenafamo/bob"}}
+{{$.Importer.Import "github.com/stephenafamo/bob/orm/loaders"}}
+{{$.Importer.Import (printf "github.com/stephenafamo/bob/dialect/%s" $.Dialect)}}
+{{end -}}
+{{if or (not $.IsTablePackage) ($.Relationships.Get $table.Key)}}{{$.Importer.Import (printf "github.com/stephenafamo/bob/dialect/%s/dialect" $.Dialect)}}{{end}}
 
 {{if $.IsTablePackage -}}
 {{if $.Relationships.Get (index .Tables 0).Key -}}
@@ -87,7 +87,7 @@ type expand{{$tAlias.UpSingular}}Preloader struct {
 	{{$.PreloaderType $table.Key}}
 }
 
-func (l expand{{$tAlias.UpSingular}}Preloader) ForExpandMap(expands map[string]struct{}, opts ...ExpandLoadOption) ([]bob.Mod[*dialect.SelectQuery], error) {
+func (l expand{{$tAlias.UpSingular}}Preloader) ForExpandMap(expands map[string]struct{}, opts ...loaders.ExpandLoadOption) ([]bob.Mod[*dialect.SelectQuery], error) {
 	paths := make([]string, 0, len(expands))
 	for path := range expands {
 		paths = append(paths, path)
@@ -96,9 +96,9 @@ func (l expand{{$tAlias.UpSingular}}Preloader) ForExpandMap(expands map[string]s
 	return l.ForExpandPaths(paths, opts...)
 }
 
-func (l expand{{$tAlias.UpSingular}}Preloader) ForExpandPaths(paths []string, opts ...ExpandLoadOption) ([]bob.Mod[*dialect.SelectQuery], error) {
-	options := newExpandLoadOptions(opts...)
-	tree, err := buildExpandTree(paths, options.maxDepth)
+func (l expand{{$tAlias.UpSingular}}Preloader) ForExpandPaths(paths []string, opts ...loaders.ExpandLoadOption) ([]bob.Mod[*dialect.SelectQuery], error) {
+	options := loaders.NewExpandLoadOptions(opts...)
+	tree, err := loaders.BuildExpandTree(paths, options.MaxDepth)
 	if err != nil {
 		return nil, err
 	}
@@ -120,15 +120,15 @@ func (l expand{{$tAlias.UpSingular}}Preloader) ForExpandPaths(paths []string, op
 	return mods, nil
 }
 
-func (l expand{{$tAlias.UpSingular}}Preloader) forExpandTree(tree expandTree, depth int, opts expandLoadOptions) ([]{{$.Dialect}}.PreloadOption, error) {
-	if opts.maxDepth >= 0 && depth > opts.maxDepth {
-		return nil, fmt.Errorf("expand path %q exceeds max depth %d", tree.path, opts.maxDepth)
+func (l expand{{$tAlias.UpSingular}}Preloader) forExpandTree(tree loaders.ExpandTree, depth int, opts loaders.ExpandLoadOptions) ([]{{$.Dialect}}.PreloadOption, error) {
+	if opts.MaxDepth >= 0 && depth > opts.MaxDepth {
+		return nil, fmt.Errorf("expand path %q exceeds max depth %d", tree.Path, opts.MaxDepth)
 	}
 
-	mods := make([]{{$.Dialect}}.PreloadOption, 0, len(tree.children))
-	for _, segment := range tree.sortedSegments() {
-		child := *tree.children[segment]
-		if child.computedTerminal(opts) {
+	mods := make([]{{$.Dialect}}.PreloadOption, 0, len(tree.Children))
+	for _, segment := range tree.SortedSegments() {
+		child := *tree.Children[segment]
+		if child.ComputedTerminal(opts) {
 			continue
 		}
 
@@ -146,8 +146,8 @@ func (l expand{{$tAlias.UpSingular}}Preloader) forExpandTree(tree expandTree, de
 				return nil, err
 			}
 			{{else -}}
-			if len(child.children) > 0 {
-				return nil, fmt.Errorf("expand path %q cannot be nested because {{$fAlias.UpSingular}} has no generated preload relationships", child.path)
+			if len(child.Children) > 0 {
+				return nil, fmt.Errorf("expand path %q cannot be nested because {{$fAlias.UpSingular}} has no generated preload relationships", child.Path)
 			}
 			{{end -}}
 			mods = append(mods, l.{{$relAlias}}(append(childOpts, {{$.Dialect}}.PreloadAs({{snakecase $relAlias | quote}}))...))
@@ -164,7 +164,7 @@ type expand{{$tAlias.UpSingular}}ThenLoader[Q orm.Loadable] struct {
 	{{$.ThenLoaderType $table.Key}}[Q]
 }
 
-func (l expand{{$tAlias.UpSingular}}ThenLoader[Q]) ForExpandMap(expands map[string]struct{}, opts ...ExpandLoadOption) ([]bob.Mod[Q], error) {
+func (l expand{{$tAlias.UpSingular}}ThenLoader[Q]) ForExpandMap(expands map[string]struct{}, opts ...loaders.ExpandLoadOption) ([]bob.Mod[Q], error) {
 	paths := make([]string, 0, len(expands))
 	for path := range expands {
 		paths = append(paths, path)
@@ -173,9 +173,9 @@ func (l expand{{$tAlias.UpSingular}}ThenLoader[Q]) ForExpandMap(expands map[stri
 	return l.ForExpandPaths(paths, opts...)
 }
 
-func (l expand{{$tAlias.UpSingular}}ThenLoader[Q]) ForExpandPaths(paths []string, opts ...ExpandLoadOption) ([]bob.Mod[Q], error) {
-	options := newExpandLoadOptions(opts...)
-	tree, err := buildExpandTree(paths, options.maxDepth)
+func (l expand{{$tAlias.UpSingular}}ThenLoader[Q]) ForExpandPaths(paths []string, opts ...loaders.ExpandLoadOption) ([]bob.Mod[Q], error) {
+	options := loaders.NewExpandLoadOptions(opts...)
+	tree, err := loaders.BuildExpandTree(paths, options.MaxDepth)
 	if err != nil {
 		return nil, err
 	}
@@ -183,15 +183,15 @@ func (l expand{{$tAlias.UpSingular}}ThenLoader[Q]) ForExpandPaths(paths []string
 	return l.forExpandTree(tree, 0, options)
 }
 
-func (l expand{{$tAlias.UpSingular}}ThenLoader[Q]) forExpandTree(tree expandTree, depth int, opts expandLoadOptions) ([]bob.Mod[Q], error) {
-	if opts.maxDepth >= 0 && depth > opts.maxDepth {
-		return nil, fmt.Errorf("expand path %q exceeds max depth %d", tree.path, opts.maxDepth)
+func (l expand{{$tAlias.UpSingular}}ThenLoader[Q]) forExpandTree(tree loaders.ExpandTree, depth int, opts loaders.ExpandLoadOptions) ([]bob.Mod[Q], error) {
+	if opts.MaxDepth >= 0 && depth > opts.MaxDepth {
+		return nil, fmt.Errorf("expand path %q exceeds max depth %d", tree.Path, opts.MaxDepth)
 	}
 
-	mods := make([]bob.Mod[Q], 0, len(tree.children))
-	for _, segment := range tree.sortedSegments() {
-		child := *tree.children[segment]
-		if child.computedTerminal(opts) {
+	mods := make([]bob.Mod[Q], 0, len(tree.Children))
+	for _, segment := range tree.SortedSegments() {
+		child := *tree.Children[segment]
+		if child.ComputedTerminal(opts) {
 			continue
 		}
 
@@ -207,8 +207,8 @@ func (l expand{{$tAlias.UpSingular}}ThenLoader[Q]) forExpandTree(tree expandTree
 			}
 			mods = append(mods, l.{{$relAlias}}(childMods...))
 			{{else -}}
-			if len(child.children) > 0 {
-				return nil, fmt.Errorf("expand path %q cannot be nested because {{$fAlias.UpSingular}} has no generated expand relationships", child.path)
+			if len(child.Children) > 0 {
+				return nil, fmt.Errorf("expand path %q cannot be nested because {{$fAlias.UpSingular}} has no generated expand relationships", child.Path)
 			}
 			mods = append(mods, l.{{$relAlias}}())
 			{{end -}}
@@ -223,141 +223,3 @@ func (l expand{{$tAlias.UpSingular}}ThenLoader[Q]) forExpandTree(tree expandTree
 
 {{end}}{{end -}}
 {{end -}}
-
-func thenLoadBuilder[Q orm.Loadable, T any](name string, f func(context.Context, bob.Executor, T, ...bob.Mod[*dialect.SelectQuery]) error) func(...bob.Mod[*dialect.SelectQuery]) orm.Loader[Q] {
-	return func(queryMods ...bob.Mod[*dialect.SelectQuery]) orm.Loader[Q] {
-    return func(ctx context.Context, exec bob.Executor, retrieved any) error {
-      loader, isLoader := retrieved.(T)
-      if !isLoader {
-        return fmt.Errorf("object %T cannot load %q", retrieved, name)
-      }
-
-      err := f(ctx, exec, loader, queryMods...)
-
-      // Don't cause an issue due to missing relationships
-      if errors.Is(err, sql.ErrNoRows) {
-        return nil
-      }
-
-      return err
-    }
-  }
-}
-
-type ExpandLoadOption func(*expandLoadOptions)
-
-type expandLoadOptions struct {
-	maxDepth         int
-	computedTerminal func(path string) bool
-}
-
-func defaultExpandLoadOptions() expandLoadOptions {
-	return expandLoadOptions{maxDepth: 10}
-}
-
-func newExpandLoadOptions(opts ...ExpandLoadOption) expandLoadOptions {
-	options := defaultExpandLoadOptions()
-	for _, opt := range opts {
-		if opt != nil {
-			opt(&options)
-		}
-	}
-
-	return options
-}
-
-func WithMaxExpandDepth(depth int) ExpandLoadOption {
-	return func(options *expandLoadOptions) {
-		options.maxDepth = depth
-	}
-}
-
-func WithComputedTerminal(fn func(path string) bool) ExpandLoadOption {
-	return func(options *expandLoadOptions) {
-		options.computedTerminal = fn
-	}
-}
-
-type expandTree struct {
-	path     string
-	children map[string]*expandTree
-}
-
-func buildExpandTree(paths []string, maxDepth int) (expandTree, error) {
-	root := expandTree{children: map[string]*expandTree{}}
-	for _, path := range paths {
-		path = strings.TrimSpace(path)
-		if path == "" {
-			continue
-		}
-
-		segments := strings.Split(path, ".")
-		if maxDepth >= 0 && len(segments) > maxDepth {
-			return expandTree{}, fmt.Errorf("expand path %q exceeds max depth %d", path, maxDepth)
-		}
-
-		node := &root
-		currentPath := ""
-		for _, segment := range segments {
-			segment = strings.TrimSpace(segment)
-			if segment == "" {
-				return expandTree{}, fmt.Errorf("expand path %q contains an empty segment", path)
-			}
-
-			if currentPath == "" {
-				currentPath = segment
-			} else {
-				currentPath += "." + segment
-			}
-
-			if node.children == nil {
-				node.children = map[string]*expandTree{}
-			}
-
-			child := node.children[segment]
-			if child == nil {
-				child = &expandTree{path: currentPath, children: map[string]*expandTree{}}
-				node.children[segment] = child
-			}
-
-			node = child
-		}
-	}
-
-	return root, nil
-}
-
-func (tree expandTree) sortedSegments() []string {
-	segments := make([]string, 0, len(tree.children))
-	for segment := range tree.children {
-		segments = append(segments, segment)
-	}
-	sort.Strings(segments)
-
-	return segments
-}
-
-func (tree expandTree) relativePaths() []string {
-	paths := make([]string, 0)
-	var walk func(expandTree, string)
-	walk = func(node expandTree, prefix string) {
-		for _, segment := range node.sortedSegments() {
-			child := *node.children[segment]
-			path := segment
-			if prefix != "" {
-				path = prefix + "." + segment
-			}
-			if len(child.children) == 0 {
-				paths = append(paths, path)
-				continue
-			}
-			walk(child, path)
-		}
-	}
-	walk(tree, "")
-	return paths
-}
-
-func (tree expandTree) computedTerminal(options expandLoadOptions) bool {
-	return len(tree.children) == 0 && options.computedTerminal != nil && options.computedTerminal(tree.path)
-}
