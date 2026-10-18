@@ -23,7 +23,7 @@ func Test{{$tAlias.UpSingular}}HasRelationsEmitExists(t *testing.T) {
 	{{- $relAlias := $tAlias.Relationship $rel.Name}}
 	t.Run("{{$relAlias}}", func(t *testing.T) {
 		q := {{$.Dialect}}.Select(
-			sm.From({{$tAlias.UpPlural}}.NameExpr()),
+			sm.From({{$.TableVar $table.Key}}.NameExpr()),
 			SelectWhere.{{$tAlias.UpPlural}}.R.Has{{$relAlias}}(),
 		)
 		sql, _, err := bob.Build(ctx, q)

@@ -333,7 +333,7 @@ func (os {{$tAlias.UpSingular}}Slice) LoadCount{{$relAlias}}(ctx context.Context
 			{{range $index, $local := $firstSide.FromColumns -}}
 			{{$toLocal := index $firstSide.ToColumns $index -}}
 			{{$firstToColAlias := index $firstTo.Columns $toLocal -}}
-			{{$firstTo.UpPlural}}.Columns.{{$firstToColAlias}}.EQ({{$.Dialect}}.Quote("bob_rel_keys", {{quote $firstToColAlias}})),
+			{{$.RelationVar $firstSide.To}}.Columns.{{$firstToColAlias}}.EQ({{$.Dialect}}.Quote("bob_rel_keys", {{quote $firstToColAlias}})),
 			{{end -}}
 		),
 		{{- else -}}

@@ -70,7 +70,7 @@ type {{$tAlias.DownSingular}}WhereR[Q {{$.Dialect}}.Filterable] struct {
 {{- $from := $.Aliases.Table $side.From -}}
 {{- $to := $.Aliases.Table $side.To -}}
 {{- $selfRef := eq $side.From $side.To -}}
-{{- $fcols := printf "%s.Columns" $to.UpPlural -}}
+{{- $fcols := printf "%s.Columns" ($.RelationVar $side.To) -}}
 {{- if $selfRef -}}{{- $fcols = "relTbl" -}}{{- end -}}
 
 // Has{{$relAlias}} filters parents that have a matching {{$relAlias}} using a
@@ -81,14 +81,14 @@ func (w {{$tAlias.DownSingular}}WhereR[Q]) Has{{$relAlias}}(filters ...bob.Mod[*
 	{{if $selfRef -}}
 	// self-referential relation: alias the subquery table so the correlation
 	// columns still reference the parent row rather than the subquery's own row.
-	relTbl := {{$to.UpPlural}}.Columns.AliasedAs("{{$relAlias}}")
+	relTbl := {{$.RelationVar $side.To}}.Columns.AliasedAs("{{$relAlias}}")
 	{{end -}}
 	q := {{$.Dialect}}.Select(
 		sm.Columns({{$.Dialect}}.Raw("1")),
 		{{if $selfRef -}}
-		sm.From({{$to.UpPlural}}.NameExpr().As("{{$relAlias}}")),
+		sm.From({{$.RelationVar $side.To}}.NameExpr().As("{{$relAlias}}")),
 		{{else -}}
-		sm.From({{$to.UpPlural}}.NameExpr()),
+		sm.From({{$.RelationVar $side.To}}.NameExpr()),
 		{{end -}}
 		{{range $i, $local := $side.FromColumns -}}
 		{{- $fromCol := index $from.Columns $local -}}
@@ -139,24 +139,24 @@ func (w {{$tAlias.DownSingular}}WhereR[Q]) Has{{$relAlias}}(filters ...bob.Mod[*
 	{{- $sTo := $.Aliases.Table $side.To -}}
 	// self-referential: alias the subquery copy of the parent table so the
 	// first-side correlation below still references the outer (parent) row.
-	rel{{$index}} := {{$sTo.UpPlural}}.Columns.AliasedAs("{{$relAlias}}{{$index}}")
+	rel{{$index}} := {{$.RelationVar $side.To}}.Columns.AliasedAs("{{$relAlias}}{{$index}}")
 	{{end -}}
 	{{end -}}
 	q := {{$.Dialect}}.Select(
 		sm.Columns({{$.Dialect}}.Raw("1")),
-		sm.From({{$firstTo.UpPlural}}.NameExpr()),
+		sm.From({{$.RelationVar $firstSide.To}}.NameExpr()),
 		{{range $index, $side := $rel.Sides -}}
 		{{- if ne $index 0 -}}
 		{{- $sFrom := $.Aliases.Table $side.From -}}
 		{{- $sTo := $.Aliases.Table $side.To -}}
 		{{- $sSelf := eq $side.To $table.Key -}}
-		{{- $sToRef := printf "%s.Columns" $sTo.UpPlural -}}
+		{{- $sToRef := printf "%s.Columns" ($.RelationVar $side.To) -}}
 		{{- if $sSelf -}}{{- $sToRef = printf "rel%d" $index -}}{{- end -}}
-		sm.InnerJoin({{$sTo.UpPlural}}.NameExpr(){{if $sSelf}}.As("{{$relAlias}}{{$index}}"){{end}}).On(
+		sm.InnerJoin({{$.RelationVar $side.To}}.NameExpr(){{if $sSelf}}.As("{{$relAlias}}{{$index}}"){{end}}).On(
 			{{range $i, $local := $side.FromColumns -}}
 			{{- $fromCol := index $sFrom.Columns $local -}}
 			{{- $toCol := index $sTo.Columns (index $side.ToColumns $i) -}}
-			{{$sToRef}}.{{$toCol}}.EQ({{$sFrom.UpPlural}}.Columns.{{$fromCol}}),
+			{{$sToRef}}.{{$toCol}}.EQ({{$.RelationVar $side.From}}.Columns.{{$fromCol}}),
 			{{- end}}
 			{{- range $where := $side.ToWhere}}
 			{{- $toCol := index $sTo.Columns $where.Column}}
@@ -168,7 +168,7 @@ func (w {{$tAlias.DownSingular}}WhereR[Q]) Has{{$relAlias}}(filters ...bob.Mod[*
 		{{range $i, $local := $firstSide.FromColumns -}}
 		{{- $fromCol := index $firstFrom.Columns $local -}}
 		{{- $toCol := index $firstTo.Columns (index $firstSide.ToColumns $i) -}}
-		sm.Where({{$firstTo.UpPlural}}.Columns.{{$toCol}}.EQ(w.cols.{{$fromCol}})),
+		sm.Where({{$.RelationVar $firstSide.To}}.Columns.{{$toCol}}.EQ(w.cols.{{$fromCol}})),
 		{{end -}}
 		{{range $where := $firstSide.FromWhere -}}
 		{{- $fromCol := index $firstFrom.Columns $where.Column -}}
@@ -176,7 +176,7 @@ func (w {{$tAlias.DownSingular}}WhereR[Q]) Has{{$relAlias}}(filters ...bob.Mod[*
 		{{end -}}
 		{{range $where := $firstSide.ToWhere -}}
 		{{- $toCol := index $firstTo.Columns $where.Column -}}
-		sm.Where({{$firstTo.UpPlural}}.Columns.{{$toCol}}.EQ({{$.Dialect}}.Arg({{quote $where.SQLValue}}))),
+		sm.Where({{$.RelationVar $firstSide.To}}.Columns.{{$toCol}}.EQ({{$.Dialect}}.Arg({{quote $where.SQLValue}}))),
 		{{end -}}
 	)
 	q.Apply(filters...)

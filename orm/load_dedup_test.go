@@ -412,7 +412,7 @@ func TestPreloadDedupCompositeKey(t *testing.T) {
 // path builds the child per row but the nested preloader dedups its own
 // collects. The tree must match the baseline.
 func TestPreloadDedupNested(t *testing.T) {
-	cols := []string{"id", "c.id", "c.name", "g.id", "g.tag"}
+	cols := []string{"id", "c.id", "c.name", "c.g.id", "c.g.tag"}
 	rows := [][]any{
 		{int64(1), int64(10), "x", int64(100), "t"},
 		{int64(2), int64(10), "x", int64(100), "t"},

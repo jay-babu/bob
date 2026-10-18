@@ -808,3 +808,32 @@ func TestLoadersTemplateGeneratesExpandDrivenPreloadMethods(t *testing.T) {
 		}
 	}
 }
+
+func TestRelationshipWhereUsesSplitRuntime(t *testing.T) {
+	for _, split := range []bool{false, true} {
+		data := expandDrivenThenLoadTemplateData()
+		data.Tables = drivers.Tables[any, any]{data.AllTables[0]}
+		data.Relationships["users"] = data.Relationships["users"][1:]
+		data.ModelSplit.Mode = modelPackageSplitModeTablePackages
+		data.ModelSplit.Enabled = split
+		content, err := fs.ReadFile(templates, "templates/where/table/100_where.bob.go.tpl")
+		if err != nil {
+			t.Fatal(err)
+		}
+		tpl, err := template.New("where").Funcs(sprig.GenericFuncMap()).Funcs(templateFunctions).Parse(string(content))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out bytes.Buffer
+		if err := tpl.Execute(&out, &data); err != nil {
+			t.Fatal(err)
+		}
+		want := "VideosRelation.Columns.UserID.EQ(w.cols.ID)"
+		if split {
+			want = "cvideos.VideosRelation.Columns.UserID.EQ(w.cols.ID)"
+		}
+		if !strings.Contains(out.String(), want) {
+			t.Fatalf("split=%v: missing %s in:\n%s", split, want, out.String())
+		}
+	}
+}
