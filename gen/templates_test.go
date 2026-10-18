@@ -837,3 +837,24 @@ func TestRelationshipWhereUsesSplitRuntime(t *testing.T) {
 		}
 	}
 }
+
+func TestRelationshipWhereTestsUseTablePackageSingleton(t *testing.T) {
+	data := expandDrivenThenLoadTemplateData()
+	data.Tables = drivers.Tables[any, any]{data.AllTables[0]}
+	data.ModelSplit.Mode = modelPackageSplitModeTablePackages
+	content, err := fs.ReadFile(templates, "templates/where/bob_where.bob_test.go.tpl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tpl, err := template.New("where_test").Funcs(sprig.GenericFuncMap()).Funcs(templateFunctions).Parse(string(content))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := tpl.Execute(&out, &data); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "SelectWhere.R.HasVideos()") || strings.Contains(out.String(), "SelectWhere.Users") {
+		t.Fatalf("incorrect table-package where reference:\n%s", out.String())
+	}
+}
