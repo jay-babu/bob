@@ -50,8 +50,11 @@ func Generate(s Schema, config Config) (Report, error) {
 	bindings := map[string]Binding{}
 	prefixes := map[string]bool{}
 	for _, t := range s.Tables {
+		if config.RowDescriptors && slices.ContainsFunc(t.Columns, func(c Column) bool { return c.GoName == "RelatedState" }) {
+			return report, fmt.Errorf("row descriptor method conflicts with column %s.RelatedState", t.Key)
+		}
 		bindings[t.Key] = binding(t, config)
-		code, err := renderTable(t)
+		code, err := renderTable(t, config.RowDescriptors)
 		if err != nil {
 			return report, err
 		}
@@ -230,7 +233,7 @@ func atomicWrite(path string, data []byte) error {
 	return os.Rename(f.Name(), path)
 }
 
-func renderTable(t Table) ([]byte, error) {
+func renderTable(t Table, descriptors bool) ([]byte, error) {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%spackage %s\nimport (\n next %q\n", header, t.Package, runtimePath)
 	nullable := false
@@ -277,6 +280,9 @@ func renderTable(t Table) ([]byte, error) {
 		fmt.Fprintf(&b, " %s\n", imp)
 	}
 	b.WriteString(")\ntype Row struct {\n")
+	if descriptors {
+		b.WriteString("relations next.Relations\n")
+	}
 	for i, c := range t.Columns {
 		typ := c.GoType
 		if t.Info.Columns[i].Nullable {
@@ -318,6 +324,14 @@ func renderTable(t Table) ([]byte, error) {
 		fmt.Fprintf(&b, "&v.%s,", c.GoName)
 	}
 	b.WriteString(");return v,err}}}\nfunc (c Columns) Query() next.RowQuery[*Row] {return next.FullRows(c.Ref,c.Projection())}\n")
+	if descriptors {
+		b.WriteString("func(v *Row) RelatedState() *next.Relations {return &v.relations}\n")
+		b.WriteString("func Descriptor() next.RowDescriptor {return next.Describe(Table,func(alias string)next.Projection[*Row]{return As(alias).Projection()},func(v *Row)[]any{return []any{")
+		for _, column := range t.Columns {
+			fmt.Fprintf(&b, "v.%s,", column.GoName)
+		}
+		b.WriteString("}},func(v *Row)*next.Relations{return &v.relations})}\n")
+	}
 	if !t.Info.ReadOnly {
 		b.WriteString("func(c Columns) Insert(v Insert) next.RowMutation[*Row] {return next.FullWrite(next.Insert(c.Ref,v.Assignments(c)...),c.Projection())}\n")
 		b.WriteString("func(c Columns) Update(v Update) next.RowMutation[*Row] {return next.FullWrite(next.Update(c.Ref,v.Assignments(c)...),c.Projection())}\n")

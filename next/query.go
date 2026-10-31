@@ -1,6 +1,9 @@
 package next
 
-import "context"
+import (
+	"context"
+	"fmt"
+)
 
 // RowQuery keeps the full-row decoder attached through query composition.
 // SQL construction and cursor management remain in the shared runtime.
@@ -8,11 +11,30 @@ import "context"
 type RowQuery[T any] struct {
 	query      SelectQuery
 	projection Projection[T]
+	relations  *RelationPlan
 }
 
 // FullRows is used by generated table bindings; callers normally use c.Query().
 func FullRows[T any](from Ref, projection Projection[T]) RowQuery[T] {
-	return RowQuery[T]{Select(from, projection.Columns...), projection}
+	return RowQuery[T]{query: Select(from, projection.Columns...), projection: projection}
+}
+
+func (q RowQuery[T]) WithRelations(plan RelationPlan) RowQuery[T] {
+	if plan.BatchSize == 0 {
+		plan.BatchSize = 100
+	}
+	if plan.MaxRows == 0 {
+		plan.MaxRows = 10000
+	}
+	if plan.Owner.Table != q.query.from.Table() || plan.BatchSize < 1 || plan.MaxRows < 1 {
+		q.query.err = fmt.Errorf("invalid relationship plan owner or bounds")
+	} else if err := validateSteps(plan.Owner, plan.Steps, 0); err != nil {
+		q.query.err = err
+	} else {
+		plan.Steps = cloneSteps(plan.Steps)
+	}
+	q.relations = &plan
+	return q
 }
 
 func (q RowQuery[T]) Build(d Dialect) (Statement, error) { return q.query.Build(d) }
@@ -45,21 +67,51 @@ func (q RowQuery[T]) AllContext(ctx context.Context) ([]T, error) {
 	if err != nil {
 		return nil, err
 	}
-	return All(ctx, s, q.query, q.projection)
+	rows, err := All(ctx, s, q.query, q.projection)
+	if err != nil {
+		return nil, err
+	}
+	if err := q.load(ctx, s, rows); err != nil {
+		return nil, err
+	}
+	return rows, nil
 }
 func (q RowQuery[T]) OneContext(ctx context.Context) (T, error) {
 	s, err := sessionFromContext(ctx)
 	if err != nil {
 		return *new(T), err
 	}
-	return One(ctx, s, q.query, q.projection)
+	row, err := One(ctx, s, q.query, q.projection)
+	if err == nil {
+		err = q.load(ctx, s, []T{row})
+	}
+	if err != nil {
+		return *new(T), err
+	}
+	return row, nil
 }
 func (q RowQuery[T]) EachContext(ctx context.Context, yield func(T) error) error {
+	if q.relations != nil {
+		return fmt.Errorf("streaming relationship loads require an explicit batched loader")
+	}
 	s, err := sessionFromContext(ctx)
 	if err != nil {
 		return err
 	}
 	return Each(ctx, s, q.query, q.projection, yield)
+}
+
+func (q RowQuery[T]) load(ctx context.Context, s Session, rows []T) error {
+	if q.relations == nil {
+		return nil
+	}
+	parents := make([]any, len(rows))
+	for i, row := range rows {
+		parents[i] = row
+	}
+	plan := q.relations
+	total := 0
+	return s.loadRelations(ctx, plan.Owner, parents, plan.Steps, plan.BatchSize, plan.MaxRows, &total)
 }
 func (q RowQuery[T]) CountContext(ctx context.Context) (int64, error) {
 	s, err := sessionFromContext(ctx)

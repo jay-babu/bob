@@ -195,9 +195,20 @@ A child outside its batch is rejected, including a child from another tenant
 whose ordinary ID happens to match. `LoadOne` rejects multiple children.
 
 Results have an explicit `Loaded` state, distinguishing not requested from loaded
-and absent. Field access performs no SQL. Loading mutates no parent model. Supply
+and absent. Field access performs no SQL. `LoadMany` and `LoadOne` return wrappers
+without mutating parent models. Supply
 an appropriate transaction when parent and child reads need one consistent
 snapshot; separate reads do not acquire snapshot consistency automatically.
+
+Generated row descriptors can also support explicit `RelationPlan` expansion on
+`RowQuery.WithRelations`. Rows hold an optional relationship-result container;
+they do not contain fields referencing every other model type. The shared loader
+pages parents first, batches FK tuples, retains composite tenant keys and follows
+only requested paths up to four levels. Default limits are 100 parents per batch
+and 10,000 total loaded relationship rows. Parent ordinals are matched in SQL,
+so grouping does not depend on Go representations of equivalent database keys.
+Automatic plans currently require PostgreSQL. `EachContext` uses explicit batch
+loaders when relationships are needed; it does not issue nested cursor queries.
 
 `SeekAfter` produces matching lexicographic predicates and ordering from typed
 cursor values. Its nonnullable ordering must include a unique parent key. Nullable

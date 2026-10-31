@@ -101,7 +101,7 @@ func TestCatalogAndGeneratedTypes(t *testing.T) {
 		for _, rel := range schema.Relations {
 			relations = append(relations, rel.Name)
 		}
-		_, err = gen.Generate(schema, gen.Config{Layout: layout, Directory: filepath.Join(dir, "models"), ImportPath: "example.org/catalog/models", Relations: relations})
+		_, err = gen.Generate(schema, gen.Config{Layout: layout, Directory: filepath.Join(dir, "models"), ImportPath: "example.org/catalog/models", Relations: relations, RowDescriptors: true})
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -61,8 +61,9 @@ type Config struct {
 	ImportPath string
 	Relations  []string
 	// Layout defaults to flat. Tables is available for narrow service imports.
-	Layout  string
-	Package string
+	Layout         string
+	Package        string
+	RowDescriptors bool
 }
 
 const (

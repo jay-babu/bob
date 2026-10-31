@@ -20,6 +20,7 @@ type Binding struct {
 	As         string `json:"as"`
 	Insert     string `json:"insert,omitempty"`
 	Update     string `json:"update,omitempty"`
+	Descriptor string `json:"descriptor,omitempty"`
 }
 
 // public is the implicit SQL schema in client-facing model names. Preserve
@@ -42,6 +43,9 @@ func binding(table Table, config Config) Binding {
 		path = config.ImportPath
 	}
 	b := Binding{ImportPath: path, Row: prefix + "Row", Table: prefix + "Table", Columns: prefix + "Columns", As: prefix + "As"}
+	if config.RowDescriptors {
+		b.Descriptor = prefix + "Descriptor"
+	}
 	if !table.Info.ReadOnly {
 		b.Insert = prefix + "Insert"
 		b.Update = prefix + "Update"
