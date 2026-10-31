@@ -1,6 +1,7 @@
 package gen_test
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -10,6 +11,57 @@ import (
 	"github.com/stephenafamo/bob/next"
 	"github.com/stephenafamo/bob/next/gen"
 )
+
+func TestPublicSchemaIsImplicitInFlatModelNames(t *testing.T) {
+	s := schema()
+	s.Tables[0].Key = "public.users"
+	s.Tables[0].Package = "public_users"
+	s.Tables[0].Info.Schema = "public"
+	other := s.Tables[0]
+	other.Key, other.Package, other.Info.Schema = "audit.users", "audit_users", "audit"
+	s.Tables = append(s.Tables, other)
+	s.Relations = []gen.Relation{{Name: "audit_user", From: "audit.users", To: "public.users", FromColumns: []string{"id"}, ToColumns: []string{"id"}}}
+	dir := t.TempDir()
+	if _, err := gen.Generate(s, gen.Config{Directory: dir, ImportPath: "example.org/models", Relations: []string{"audit_user"}}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "go-bindings.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var document struct {
+		Tables map[string]gen.Binding `json:"tables"`
+	}
+	if err := json.Unmarshal(data, &document); err != nil {
+		t.Fatal(err)
+	}
+	bindings := document.Tables
+	if b := bindings["public.users"]; b.Row != "UsersRow" || b.As != "UsersAs" || b.Columns != "UsersColumns" || b.Table != "UsersTable" || b.Insert != "UsersInsert" || b.Update != "UsersUpdate" {
+		t.Fatal("public schema leaked into client names", b)
+	}
+	if b := bindings["audit.users"]; b.Row != "AuditUsersRow" {
+		t.Fatal("non-public schema prefix was lost", b)
+	}
+	code, err := os.ReadFile(filepath.Join(dir, "public_users.bob.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(code), "PublicUsers") || !strings.Contains(string(code), `Schema: "public"`) || !strings.Contains(string(code), "func UsersAs(") {
+		t.Fatal("generated names or SQL schema are incorrect", string(code))
+	}
+	code, err = os.ReadFile(filepath.Join(dir, "relations/audit_user/relation.bob.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(code), "from.AuditUsersTable") || !strings.Contains(string(code), "from.UsersTable") {
+		t.Fatal("relationship did not use emitted table names", string(code))
+	}
+	// Omitting public must not silently merge conflicting Go namespaces.
+	s.Tables[1].Package = "users"
+	if _, err := gen.Generate(s, gen.Config{Directory: t.TempDir(), ImportPath: "example.org/models"}); err == nil {
+		t.Fatal("colliding model names were accepted")
+	}
+}
 
 func schema() gen.Schema {
 	return gen.Schema{Version: gen.Version, Tables: []gen.Table{{Key: "users", Package: "users", Info: next.TableInfo{Name: "users", PrimaryKey: []string{"id"}, Columns: []next.ColumnInfo{{Name: "id", HasDefault: true}, {Name: "name"}, {Name: "note", Nullable: true}, {Name: "computed", Generated: true}}}, Columns: []gen.Column{{Name: "id", GoName: "ID", GoType: "int64"}, {Name: "name", GoName: "Name", GoType: "string"}, {Name: "note", GoName: "Note", GoType: "string"}, {Name: "computed", GoName: "Computed", GoType: "int64"}}}}}

@@ -56,7 +56,7 @@ func Generate(s Schema, config Config) (Report, error) {
 			return report, err
 		}
 		if config.Layout == Flat {
-			prefix := Identifier(t.Package)
+			prefix := flatPrefix(t)
 			if prefixes[prefix] {
 				return report, fmt.Errorf("duplicate flat namespace %s", prefix)
 			}

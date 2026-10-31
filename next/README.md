@@ -20,6 +20,9 @@ PostgreSQL catalogs --> versioned schema metadata --> model package(s)
 
 Generation defaults to one model package containing namespaced rows, columns,
 insert/update inputs and scanners. It does not embed relationships into rows.
+The `public` schema is implicit in Go model names: `public.cohort_item` generates
+`CohortItemRow`, `CohortItemAs` and `CohortItemUpdate`. SQL metadata retains the
+schema, and other schemas retain their name prefixes to distinguish tables.
 Relationship descriptors import model definitions; models never import descriptor
 packages. Cycles, reverse edges and heavily referenced audit tables are retained.
 

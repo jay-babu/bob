@@ -7,6 +7,7 @@ import (
 	"go/format"
 	"go/parser"
 	"go/token"
+	"strings"
 )
 
 // Binding is the emitted Go location, independent of a table's logical namespace.
@@ -21,10 +22,20 @@ type Binding struct {
 	Update     string `json:"update,omitempty"`
 }
 
+// public is the implicit SQL schema in client-facing model names. Preserve
+// custom namespaces and prefixes for every other schema.
+func flatPrefix(table Table) string {
+	name := table.Package
+	if table.Info.Schema == "public" {
+		name = strings.TrimPrefix(name, "public_")
+	}
+	return Identifier(name)
+}
+
 func binding(table Table, config Config) Binding {
 	prefix, path := "", config.ImportPath+"/"+table.Package
 	if config.Layout == Flat {
-		prefix = Identifier(table.Package)
+		prefix = flatPrefix(table)
 		path = config.ImportPath
 	}
 	b := Binding{ImportPath: path, Row: prefix + "Row", Table: prefix + "Table", Columns: prefix + "Columns", As: prefix + "As"}
