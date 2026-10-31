@@ -3,6 +3,7 @@ package next
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"reflect"
@@ -76,14 +77,26 @@ func (s Session) observe(ctx context.Context, stmt Statement, start time.Time, r
 	s.observer(ctx, Event{stmt.SQL, types, time.Since(start), rows, s.inTx, safeErr})
 }
 
+func (s Session) finished(ctx context.Context, stmt Statement, start time.Time, count *int64, err *error) {
+	if reason := recover(); reason != nil {
+		s.observe(ctx, stmt, start, *count, errors.New("operation panicked"))
+		panic(reason)
+	}
+	s.observe(ctx, stmt, start, *count, *err)
+}
+
 func (s Session) Exec(ctx context.Context, q Buildable) (affected int64, err error) {
 	stmt, err := q.Build(s.dialect)
 	if err != nil {
 		return 0, err
 	}
 	start := time.Now()
-	defer func() { s.observe(ctx, stmt, start, affected, err) }()
-	result, err := s.executor.ExecContext(ctx, stmt.SQL, stmt.Args...)
+	defer s.finished(ctx, stmt, start, &affected, &err)
+	args, err := driverArgs(stmt.Args)
+	if err != nil {
+		return 0, err
+	}
+	result, err := s.executor.ExecContext(ctx, stmt.SQL, args...)
 	if err != nil {
 		return 0, Classify(err)
 	}
@@ -140,14 +153,30 @@ func Each[T any](ctx context.Context, s Session, q Buildable, p Projection[T], y
 	if p.Scan == nil || yield == nil {
 		return fmt.Errorf("projection scanner and consumer are required")
 	}
+	return s.each(ctx, q, p.Columns, func(row Scanner) (bool, error) {
+		value, err := p.Scan(row)
+		if err != nil {
+			return false, err
+		}
+		return true, yield(value)
+	})
+}
+
+// Keep execution and cursor management outside generic code: a schema with
+// hundreds of row layouts must not compile a second executor for every layout.
+func (s Session) each(ctx context.Context, q Buildable, columns []Selection, consume func(Scanner) (bool, error)) (err error) {
 	stmt, err := q.Build(s.dialect)
 	if err != nil {
 		return err
 	}
 	start := time.Now()
 	var count int64
-	defer func() { s.observe(ctx, stmt, start, count, err) }()
-	rows, err := s.executor.QueryContext(ctx, stmt.SQL, stmt.Args...)
+	defer s.finished(ctx, stmt, start, &count, &err)
+	args, err := driverArgs(stmt.Args)
+	if err != nil {
+		return err
+	}
+	rows, err := s.executor.QueryContext(ctx, stmt.SQL, args...)
 	if err != nil {
 		return Classify(err)
 	}
@@ -156,10 +185,10 @@ func Each[T any](ctx context.Context, s Session, q Buildable, p Projection[T], y
 	if err != nil {
 		return err
 	}
-	expected := make([]string, len(p.Columns))
+	expected := make([]string, len(columns))
 	seen := map[string]bool{}
-	for i, c := range p.Columns {
-		expected[i] = c.label
+	for i, c := range columns {
+		expected[i] = identifierAlias(c.label, s.dialect)
 		if expected[i] == "" {
 			if n, ok := c.node.(columnNode); ok {
 				expected[i] = n.name
@@ -174,16 +203,39 @@ func Each[T any](ctx context.Context, s Session, q Buildable, p Projection[T], y
 		return fmt.Errorf("result columns %v do not match projection %v", actual, expected)
 	}
 	for rows.Next() {
-		v, scanErr := p.Scan(rows)
-		if scanErr != nil {
-			return scanErr
+		decoded, err := consume(rows)
+		if decoded {
+			count++
 		}
-		count++
-		if err := yield(v); err != nil {
+		if err != nil {
 			return err
 		}
 	}
 	return Classify(rows.Err())
+}
+
+// Resolve Valuer values before handing them to driver-specific encoders. In
+// particular, pgx's fallback from a Valuer through a flat slice drops PostgreSQL
+// array lower bounds; a standard string parameter uses its lossless text path.
+func driverArgs(values []any) ([]any, error) {
+	args := make([]any, len(values))
+	for i, value := range values {
+		if named, ok := value.(sql.NamedArg); ok {
+			converted, err := driver.DefaultParameterConverter.ConvertValue(named.Value)
+			if err != nil {
+				return nil, fmt.Errorf("parameter %d: %w", i+1, err)
+			}
+			named.Value = converted
+			args[i] = named
+			continue
+		}
+		converted, err := driver.DefaultParameterConverter.ConvertValue(value)
+		if err != nil {
+			return nil, fmt.Errorf("parameter %d: %w", i+1, err)
+		}
+		args[i] = converted
+	}
+	return args, nil
 }
 
 // SQL allows SQL-defined queries to share scanning, transactions and observation.

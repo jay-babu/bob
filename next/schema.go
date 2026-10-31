@@ -23,6 +23,7 @@ type TableInfo struct {
 	Columns    []ColumnInfo `json:"columns"`
 	PrimaryKey []string     `json:"primary_key,omitempty"`
 	UniqueKeys [][]string   `json:"unique_keys,omitempty"`
+	ReadOnly   bool         `json:"read_only,omitempty"`
 }
 
 // Table has no references to related tables or row types.

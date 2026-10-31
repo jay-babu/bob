@@ -30,15 +30,45 @@ func Generate(s Schema, config Config) (Report, error) {
 	if config.Directory == "" || config.ImportPath == "" || strings.ContainsAny(config.ImportPath, "\"\n\r\\") {
 		return report, fmt.Errorf("output directory and valid import path are required")
 	}
+	if config.Layout == "" {
+		config.Layout = Flat
+	}
+	if config.Package == "" {
+		config.Package = "models"
+	}
+	if (config.Layout != Flat && config.Layout != Tables) || !validName(config.Package) {
+		return report, fmt.Errorf("invalid output layout or package")
+	}
 	files := map[string][]byte{}
-	tables := map[string]Table{}
+	for _, typ := range s.Types {
+		code, err := renderType(typ)
+		if err != nil {
+			return report, err
+		}
+		files["types/"+typ.Package+"/type.bob.go"] = code
+	}
+	bindings := map[string]Binding{}
+	prefixes := map[string]bool{}
 	for _, t := range s.Tables {
-		tables[t.Key] = t
+		bindings[t.Key] = binding(t, config)
 		code, err := renderTable(t)
 		if err != nil {
 			return report, err
 		}
-		files[t.Package+"/table.bob.go"] = code
+		if config.Layout == Flat {
+			prefix := Identifier(t.Package)
+			if prefixes[prefix] {
+				return report, fmt.Errorf("duplicate flat namespace %s", prefix)
+			}
+			prefixes[prefix] = true
+			code, err = flatSource(code, config.Package, prefix)
+			if err != nil {
+				return report, err
+			}
+			files[t.Package+".bob.go"] = code
+		} else {
+			files[t.Package+"/table.bob.go"] = code
+		}
 	}
 	for _, name := range config.Relations {
 		found := false
@@ -47,15 +77,15 @@ func Generate(s Schema, config Config) (Report, error) {
 				continue
 			}
 			found = true
-			from, to := tables[r.From], tables[r.To]
+			from, to := bindings[r.From], bindings[r.To]
 			var b strings.Builder
-			fmt.Fprintf(&b, "%spackage %s\nimport (\n next %q\n from %q\n", header, r.Name, runtimePath, config.ImportPath+"/"+from.Package)
+			fmt.Fprintf(&b, "%spackage %s\nimport (\n next %q\n from %q\n", header, r.Name, runtimePath, from.ImportPath)
 			target := "from"
-			if r.From != r.To {
-				fmt.Fprintf(&b, " to %q\n", config.ImportPath+"/"+to.Package)
+			if from.ImportPath != to.ImportPath {
+				fmt.Fprintf(&b, " to %q\n", to.ImportPath)
 				target = "to"
 			}
-			fmt.Fprintf(&b, ")\nvar Relation = next.Relation{From: from.Table, To: %s.Table, FromColumns: %#v, ToColumns: %#v}\n", target, r.FromColumns, r.ToColumns)
+			fmt.Fprintf(&b, ")\nvar Relation = next.Relation{From: from.%s, To: %s.%s, FromColumns: %#v, ToColumns: %#v}\n", from.Table, target, to.Table, r.FromColumns, r.ToColumns)
 			code, err := format.Source([]byte(b.String()))
 			if err != nil {
 				return report, err
@@ -75,12 +105,23 @@ func Generate(s Schema, config Config) (Report, error) {
 	}
 	slices.SortFunc(s.Tables, func(a, b Table) int { return strings.Compare(a.Key, b.Key) })
 	s.Relations = slices.Clone(s.Relations)
+	s.Types = slices.Clone(s.Types)
+	slices.SortFunc(s.Types, func(a, b Type) int { return strings.Compare(a.Package, b.Package) })
 	slices.SortFunc(s.Relations, func(a, b Relation) int { return strings.Compare(a.Name, b.Name) })
 	metadata, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
 		return report, err
 	}
 	files["schema.json"] = append(metadata, '\n')
+	bound, err := json.MarshalIndent(struct {
+		Version int                `json:"version"`
+		Layout  string             `json:"layout"`
+		Tables  map[string]Binding `json:"tables"`
+	}{1, config.Layout, bindings}, "", "  ")
+	if err != nil {
+		return report, err
+	}
+	files["go-bindings.json"] = append(bound, '\n')
 	old := map[string]string{}
 	manifestPath := filepath.Join(config.Directory, manifestFile)
 	if data, readErr := os.ReadFile(manifestPath); readErr == nil {
@@ -226,6 +267,13 @@ func renderTable(t Table) ([]byte, error) {
 		b.WriteString(" \"database/sql\"\n")
 	}
 	for _, imp := range imports {
+		parts := strings.Fields(imp)
+		if len(parts) > 0 && parts[len(parts)-1] == strconv.Quote(runtimePath) {
+			if len(parts) == 2 && parts[0] == "next" {
+				continue
+			}
+			return nil, fmt.Errorf("generated runtime import must use the next alias")
+		}
 		fmt.Fprintf(&b, " %s\n", imp)
 	}
 	b.WriteString(")\ntype Row struct {\n")
@@ -237,14 +285,14 @@ func renderTable(t Table) ([]byte, error) {
 		fmt.Fprintf(&b, " %s %s\n", c.GoName, typ)
 	}
 	b.WriteString("}\nvar Table = next.DefineTable(next.TableInfo{\n")
-	fmt.Fprintf(&b, "Schema:%q,Name:%q,PrimaryKey:%#v,UniqueKeys:%#v,Columns:[]next.ColumnInfo{\n", t.Info.Schema, t.Info.Name, t.Info.PrimaryKey, t.Info.UniqueKeys)
+	fmt.Fprintf(&b, "Schema:%q,Name:%q,ReadOnly:%t,PrimaryKey:%#v,UniqueKeys:%#v,Columns:[]next.ColumnInfo{\n", t.Info.Schema, t.Info.Name, t.Info.ReadOnly, t.Info.PrimaryKey, t.Info.UniqueKeys)
 	for _, c := range t.Info.Columns {
 		fmt.Fprintf(&b, "{Name:%q,DBType:%q,Nullable:%t,HasDefault:%t,Generated:%t},\n", c.Name, c.DBType, c.Nullable, c.HasDefault, c.Generated)
 	}
 	b.WriteString("}})\ntype Columns struct { Ref next.Ref\n")
 	for i, c := range t.Columns {
 		typ := "Column"
-		if t.Info.Columns[i].Generated {
+		if t.Info.Columns[i].Generated || t.Info.ReadOnly {
 			typ = "Expr"
 		}
 		fmt.Fprintf(&b, " %s next.%s[%s]\n", c.GoName, typ, c.GoType)
@@ -252,21 +300,24 @@ func renderTable(t Table) ([]byte, error) {
 	b.WriteString("}\nfunc As(alias string) Columns { r := Table.As(alias); return Columns{Ref:r,\n")
 	for i, c := range t.Columns {
 		suffix := ""
-		if t.Info.Columns[i].Generated {
+		if t.Info.Columns[i].Generated || t.Info.ReadOnly {
 			suffix = ".Expr()"
 		}
 		fmt.Fprintf(&b, "%s:next.Field[%s](r,%q)%s,\n", c.GoName, c.GoType, c.Name, suffix)
 	}
-	b.WriteString("}}\nfunc (c Columns) Projection() next.Projection[Row] {return next.Projection[Row]{Columns:[]next.Selection{\n")
+	b.WriteString("}}\nfunc (c Columns) Projection() next.Projection[*Row] {return next.Projection[*Row]{Columns:[]next.Selection{\n")
 	for _, c := range t.Columns {
 		fmt.Fprintf(&b, "c.%s.Select(%q),\n", c.GoName, c.Name)
 	}
-	b.WriteString("},Scan:func(s next.Scanner)(Row,error){ var v Row; err:=s.Scan(")
+	b.WriteString("},Scan:func(s next.Scanner)(*Row,error){ v:=new(Row); err:=s.Scan(")
 	for _, c := range t.Columns {
 		fmt.Fprintf(&b, "&v.%s,", c.GoName)
 	}
 	b.WriteString(");return v,err}}}\n")
 	for _, kind := range []string{"Insert", "Update"} {
+		if t.Info.ReadOnly {
+			break
+		}
 		fmt.Fprintf(&b, "type %s struct {\n", kind)
 		for i, c := range t.Columns {
 			info := t.Info.Columns[i]
@@ -306,3 +357,40 @@ func renderTable(t Table) ([]byte, error) {
 
 // Import returns a quoted Go import path suitable for Table.Imports.
 func Import(path string) string { return strconv.Quote(path) }
+
+func renderType(typ Type) ([]byte, error) {
+	var b strings.Builder
+	fmt.Fprintf(&b, "%spackage %s\n", header, typ.Package)
+	switch typ.Kind {
+	case "domain":
+		fmt.Fprintf(&b, "import (next %q\n", runtimePath)
+		imports := slices.Clone(typ.Imports)
+		slices.Sort(imports)
+		imports = slices.Compact(imports)
+		for _, imp := range imports {
+			if imp != `next `+strconv.Quote(runtimePath) {
+				fmt.Fprintln(&b, imp)
+			}
+		}
+		fmt.Fprintf(&b, ")\ntype Value struct {next.Domain[%s]}\n", typ.Base)
+	case "text":
+		b.WriteString("type Value string\n")
+	case "enum":
+		b.WriteString("type Value string\nconst (\n")
+		seen := map[string]bool{}
+		for _, value := range typ.Values {
+			name := Identifier(value)
+			if name == "" || name == "Value" || seen[name] {
+				name = "Option" + name + digest([]byte(value))[:8]
+			}
+			seen[name] = true
+			fmt.Fprintf(&b, "%s Value = %q\n", name, value)
+		}
+		b.WriteString(")\n")
+	}
+	code, err := format.Source([]byte(b.String()))
+	if err != nil {
+		return nil, fmt.Errorf("render type %s: %w", typ.Package, err)
+	}
+	return code, nil
+}

@@ -11,9 +11,8 @@ import (
 	"testing"
 
 	n "github.com/stephenafamo/bob/next"
-	"github.com/stephenafamo/bob/next/examples/models/posts"
+	"github.com/stephenafamo/bob/next/examples/models"
 	"github.com/stephenafamo/bob/next/examples/models/relations/postsuser"
-	"github.com/stephenafamo/bob/next/examples/models/users"
 	"github.com/stephenafamo/bob/next/gen"
 )
 
@@ -21,15 +20,15 @@ func TestGeneratedModelsEndToEnd(t *testing.T) {
 	db := database(t)
 	ctx := context.Background()
 	s := n.NewSession(db, n.SQLite, nil)
-	u := users.As("u")
+	u := models.UsersAs("u")
 	p := u.Projection()
-	input := users.Insert{ID: 3, Tenant: 7, Name: "Charlie", Note: n.Nullable(n.Set("memo"))}
+	input := models.UsersInsert{ID: 3, Tenant: 7, Name: "Charlie", Note: n.Nullable(n.Set("memo"))}
 	row, err := n.One(ctx, s, n.Insert(u.Ref, input.Assignments(u)...).Returning(p.Columns...), p)
 	if err != nil {
 		t.Fatal(err)
 	}
-	require(t, row, users.Row{ID: 3, Tenant: 7, Name: "Charlie", Note: sql.Null[string]{V: "memo", Valid: true}, Version: 1, Fingerprint: 6})
-	update := users.Update{Name: n.Set("Changed"), Note: n.Null[string](), Version: n.SetExpr(n.Add(u.Version.Expr(), n.Value(int64(1))))}
+	require(t, row, &models.UsersRow{ID: 3, Tenant: 7, Name: "Charlie", Note: sql.Null[string]{V: "memo", Valid: true}, Version: 1, Fingerprint: 6})
+	update := models.UsersUpdate{Name: n.Set("Changed"), Note: n.Null[string](), Version: n.SetExpr(n.Add(u.Version.Expr(), n.Value(int64(1))))}
 	if err = s.ExecOne(ctx, n.Update(u.Ref, update.Assignments(u)...).Where(u.Tenant.EQ(7), u.ID.EQ(3), u.Version.EQ(1))); err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +41,7 @@ func TestGeneratedModelsEndToEnd(t *testing.T) {
 	}
 	require(t, row.Note.Valid, false)
 	require(t, row.Version, int64(2))
-	post := posts.As("p")
+	post := models.PostsAs("p")
 	rows, err := n.All(ctx, s, n.Select(u.Ref, p.Columns...).Where(u.Tenant.EQ(7), postsuser.Relation.Reverse().Exists(u.Ref, post.Ref)).OrderBy(u.ID.Asc()).Limit(1), p)
 	if err != nil {
 		t.Fatal(err)
@@ -71,8 +70,8 @@ func TestGeneratedModelsEndToEnd(t *testing.T) {
 func TestParentCountIgnoresCollectionMultiplicity(t *testing.T) {
 	db := database(t)
 	s := n.NewSession(db, n.SQLite, nil)
-	u := users.As("u")
-	p := posts.As("p")
+	u := models.UsersAs("u")
+	p := models.PostsAs("p")
 	q := n.Select(u.Ref, u.ID.Select("id")).JoinRelation(postsuser.Relation.Reverse(), u.Ref, p.Ref, false).Where(u.Tenant.EQ(7)).Limit(1)
 	count, err := n.One(context.Background(), s, n.ParentCount(q), n.CountProjection())
 	if err != nil {
@@ -127,7 +126,7 @@ func TestKeysetPaginationTiesAndScope(t *testing.T) {
 	db := database(t)
 	ctx := context.Background()
 	s := n.NewSession(db, n.SQLite, nil)
-	u := users.As("u")
+	u := models.UsersAs("u")
 	p := u.Projection()
 	first := n.Select(u.Ref, p.Columns...).SeekAfter(n.Cursor(u.Tenant, int64(7), false), n.Cursor(u.ID, int64(1), false)).Limit(10)
 	rows, err := n.All(ctx, s, first, p)

@@ -1,0 +1,85 @@
+{
+  "scope": {
+    "logical_objects": 301,
+    "columns": 3020,
+    "foreign_keys": 775,
+    "matching_full_row_reads": 300,
+    "audit_reason_incoming_foreign_keys": 196,
+    "source": "read-only local test schema, matching current migration digest",
+    "go": "go version go1.27.3 linux/amd64"
+  },
+  "baseline": {
+    "generated_go_files": 1511,
+    "generated_go_bytes": 15178110,
+    "default": {
+      "exit_code": 1,
+      "seconds": 396.51,
+      "max_process_rss_kib": 1086096,
+      "diagnostics": "none captured"
+    },
+    "serial": {
+      "seconds": 465.59,
+      "sampled_process_tree_rss_kib": 1117720,
+      "exit_code": 1,
+      "max_process_rss_kib": 1062676,
+      "error": "build terminated without compiler diagnostics"
+    }
+  },
+  "flat": {
+    "generated_go_files": 1080,
+    "generated_go_bytes": 2077629,
+    "clean": {
+      "seconds": 17.63,
+      "sampled_process_tree_rss_kib": 705112,
+      "exit_code": 0,
+      "max_process_rss_kib": 672848,
+      "binary_bytes": 6446603
+    },
+    "warm": {
+      "seconds": 0.18,
+      "sampled_process_tree_rss_kib": 29144,
+      "exit_code": 0,
+      "max_process_rss_kib": 26796,
+      "binary_bytes": 6446603
+    },
+    "application_edit": {
+      "seconds": 2.68,
+      "sampled_process_tree_rss_kib": 233824,
+      "exit_code": 0,
+      "max_process_rss_kib": 203764,
+      "binary_bytes": 6446603
+    }
+  },
+  "tables": {
+    "generated_go_files": 1080,
+    "generated_go_bytes": 1980889,
+    "clean": {
+      "seconds": 48.54,
+      "sampled_process_tree_rss_kib": 717780,
+      "exit_code": 0,
+      "max_process_rss_kib": 563720,
+      "binary_bytes": 6579619
+    },
+    "warm": {
+      "seconds": 0.22,
+      "sampled_process_tree_rss_kib": 54548,
+      "exit_code": 0,
+      "max_process_rss_kib": 34020,
+      "binary_bytes": 6579619
+    },
+    "application_edit": {
+      "seconds": 4.3,
+      "sampled_process_tree_rss_kib": 598104,
+      "exit_code": 0,
+      "max_process_rss_kib": 562388,
+      "binary_bytes": 6579619
+    }
+  },
+  "limitations": [
+    "Single measurements on a shared host; timings are directional.",
+    "The baseline did not complete successfully, so no successful full-build speedup or baseline binary-size ratio is claimed.",
+    "Maximum process RSS is GNU time data. Sampled process-tree RSS sums all build descendants across all their threads and can count shared pages more than once.",
+    "This is a stress consumer using real schema shapes, not a migrated or deployed Zeus service.",
+    "Native JSON defaults and SQL type choices are deliberately independent of legacy application transport models."
+  ]
+}

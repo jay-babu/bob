@@ -1,45 +1,91 @@
-# Build experiment
+# Build measurements
+
+The current experiment uses a read-only snapshot of the local Zeus test database.
+Its migration digest matched the current migration directory before inspection.
+No application data was read or written. Private schema documents and generated
+models remain outside this repository; only aggregate results are recorded.
+
+The input contains 301 logical objects, 3,020 columns and 775 foreign keys. It
+includes the audit-reason table and all 196 incoming foreign keys. The consumer
+performs a full-row typed read for each of the 300 tables shared with the existing
+generated layer. Both directions of FK traversal remain available independently
+of layout. Descriptor packages are generated, but unused descriptors are not
+imported by the read consumer.
+
+## Real schema result
+
+| Metric | Existing layer | Default flat layout | Optional table layout |
+| --- | ---: | ---: | ---: |
+| Generated Go bytes | 15,178,110 | 2,077,629 | 1,980,889 |
+| Generated Go files, including descriptors | 1,511 | 1,080 | 1,080 |
+| Successful clean build | No | 17.63 s | 48.54 s |
+| Warm build | — | 0.18 s | 0.22 s |
+| Application edit | — | 2.68 s | 4.30 s |
+| Executable bytes | — | 6,446,603 | 6,579,619 |
+| Clean maximum process RSS | 1,086,096 KiB before failure | 672,848 KiB | 563,720 KiB |
+| Clean sampled process-tree RSS | Not captured reliably in first run | 705,112 KiB | 717,780 KiB |
+
+The existing layer exited unsuccessfully in both default and serial package
+compilation: after 396.51 seconds by default and 465.59 seconds with `-p 1`.
+No compiler diagnostics were captured. The failure cause was not established, so
+it is not labeled an OOM. These are censored build attempts, not successful
+baseline timings. No real-schema baseline executable-size ratio is claimed.
+
+The default flat output needs approximately 86% less generated Go than the
+existing layer while retaining the previously excluded table and FK metadata.
+Its lower package count improved the whole-schema consumer's clean and app-edit
+builds. Table layout has a smaller largest compiler process and offers narrower
+imports and schema-change caching for small services. Neither layout drops
+relationships or forces callers into one-way navigation.
+
+These are individual runs on a shared Linux host with Go 1.27.3, not a statistical
+performance guarantee. A clean build uses an empty private Go cache and includes
+standard-library compilation. The baseline uses the supplied workspace's actual
+pinned fork, not the new runtime. The consumer is built but never executed.
+Functions are separated per table, so one artificial giant Go function does not
+dominate the compiler result. Binaries retain the typed read paths.
+
+GNU time reports the largest process's maximum RSS. The sampler also sums build
+descendants across every thread's child list; summed RSS can count shared pages
+more than once and is not unique physical memory. Generation byte counts include
+all Go descriptor files; compilation includes only reachable packages.
+
+Machine-readable data is in [real-results.json](real-results.json).
+
+## Reproduce
+
+Generate the real schema into private output twice using the same `-import` path:
+
+```sh
+go run ./next/cmd/bobgen-db -schemas public,reference,audit,scrape \
+  -out /tmp/flat/models -import example.org/real/models -relations all -layout flat
+go run ./next/cmd/bobgen -schema /tmp/flat/models/schema.json \
+  -out /tmp/tables/models -import example.org/real/models -relations all -layout tables
+```
+
+Then use the supplied existing generated models and workspace:
+
+```sh
+python next/benchmarks/real_schema.py \
+  --models /tmp/flat/models \
+  --legacy-models /path/to/existing/bobmodels \
+  --legacy-workspace /path/to/existing/go.work
+```
+
+`--only compact` profiles a layout without repeating the expensive baseline.
+`--parallelism 1` controls package build concurrency for both variants. The script
+creates separate temporary consumers, workspaces and caches; it changes no source
+service, source module, original workspace or database. `go-bindings.json` supplies
+actual generated import paths and symbol names for either layout.
+
+The earlier 150-table synthetic fixture remains reproducible with:
 
 ```sh
 python next/benchmarks/compare.py --tables 150 --columns 16
 go test ./next -run '^$' -bench BenchmarkBuild -benchmem
 ```
 
-The script compiles an offline schema fixture generator, generates both variants,
-and builds a consumer that selects full rows from the referenced owner table.
-The fixture contains one owner and 149 referencing tables, each with 16 columns.
-It uses the existing fork as the baseline, including its table-package split and
-forward-only relationship policy. Factories and slice mutations are disabled in
-the baseline, matching the production configuration's slice-mutation setting.
-
-Every variant gets its own empty Go build cache. It measures clean build, unchanged
-build, an application comment edit, and adding one field to an unrelated child
-table. The last case already benefits from the baseline's table-package split;
-it is not evidence of a newly fixed baseline dependency problem. All generated Go
-files count toward source size, but only the packages reachable by the consumer
-are compiled. No database or driver is included in the consumer executable.
-
-The compact output has fewer generated conveniences. This compares an architecture
-and one equivalent read operation, not feature-equivalent libraries or complete
-Zeus services. Do not extrapolate these numbers to the production schema. Cold
-build costs include the standard library. GNU time's maximum process RSS is the
-largest process's peak, not total concurrent compiler memory. The script records
-errors rather than turning a failed baseline into a performance comparison.
-
-The checked-in sample is one run on a shared Linux host, with Go 1.27.3. Build
-timings are directional, not a statistical performance claim. The peak compiler
-memory result did not improve. Use repeated isolated runs and real service
-consumers before setting performance guarantees.
-
-| Metric | Existing fork | Compact design |
-| --- | ---: | ---: |
-| Generated Go files | 750 | 150 |
-| Generated Go bytes | 7,079,248 | 915,896 |
-| Clean build | 10.99 s | 7.88 s |
-| Warm build | 0.10 s | 0.08 s |
-| Application edit | 0.99 s | 0.48 s |
-| Unrelated schema edit | 0.10 s | 0.08 s |
-| Executable bytes | 4,297,716 | 3,332,036 |
-| Clean maximum process RSS | 282,032 KiB | 282,972 KiB |
-
-Machine-readable results are in [sample-results.json](sample-results.json).
+Its initial historical data is [sample-results.json](sample-results.json). That
+small single-table consumer did not show compiler-memory improvement and should
+not be substituted for the real-schema experiment. The native introspection and
+value layer has changed since that initial measurement.

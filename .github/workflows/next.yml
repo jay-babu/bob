@@ -1,0 +1,24 @@
+name: Schema runtime redesign
+
+on:
+  pull_request:
+    paths: ['next/**', 'go.mod', 'go.sum', '.github/workflows/next.yml']
+  push:
+    branches: ['feat/schema-runtime-redesign']
+
+jobs:
+  postgres:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Cache the isolated integration server image
+        run: docker pull postgres:17-bookworm
+      - name: Test the native schema path and runtime
+        env:
+          BOB_NEXT_REQUIRE_POSTGRES: '1'
+        run: go test -race ./next/...
+      - name: Check the new packages
+        run: go vet ./next/...

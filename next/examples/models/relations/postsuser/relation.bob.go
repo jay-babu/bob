@@ -4,8 +4,7 @@ package postsuser
 
 import (
 	next "github.com/stephenafamo/bob/next"
-	from "github.com/stephenafamo/bob/next/examples/models/posts"
-	to "github.com/stephenafamo/bob/next/examples/models/users"
+	from "github.com/stephenafamo/bob/next/examples/models"
 )
 
-var Relation = next.Relation{From: from.Table, To: to.Table, FromColumns: []string{"tenant", "user_id"}, ToColumns: []string{"tenant", "id"}}
+var Relation = next.Relation{From: from.PostsTable, To: from.UsersTable, FromColumns: []string{"tenant", "user_id"}, ToColumns: []string{"tenant", "id"}}

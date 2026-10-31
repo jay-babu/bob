@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 type Dialect uint8
@@ -51,6 +52,15 @@ func (e Expr[T]) GT(value T) Predicate          { return compare(e.node, ">", Va
 func (e Expr[T]) GE(value T) Predicate          { return compare(e.node, ">=", Value(value).node) }
 func (e Expr[T]) LT(value T) Predicate          { return compare(e.node, "<", Value(value).node) }
 func (e Expr[T]) LE(value T) Predicate          { return compare(e.node, "<=", Value(value).node) }
+func (e Expr[T]) IsNull() Predicate             { return Predicate{unaryNode{e.node, "IS NULL"}} }
+func (e Expr[T]) IsNotNull() Predicate          { return Predicate{unaryNode{e.node, "IS NOT NULL"}} }
+func (e Expr[T]) In(values ...T) Predicate {
+	nodes := make([]node, len(values))
+	for i, value := range values {
+		nodes[i] = valueNode{value}
+	}
+	return Predicate{inNode{e.node, nodes}}
+}
 
 // Like is restricted to string expressions; callers choose wildcard escaping.
 func Like[T ~string](value Expr[T], pattern T) Predicate {
@@ -58,7 +68,7 @@ func Like[T ~string](value Expr[T], pattern T) Predicate {
 }
 
 type Number interface {
-	~int | ~int8 | ~int16 | ~int32 | ~int64 | ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~float32 | ~float64
+	~int | ~int8 | ~int16 | ~int32 | ~int64 | ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~float32 | ~float64 | Decimal
 }
 
 func Add[T Number](a, b Expr[T]) Expr[T] { return Expr[T]{binaryNode{a.node, "+", b.node}} }
@@ -118,7 +128,37 @@ func (r *renderer) ref(ref Ref) {
 	}
 	r.ident(i.Name)
 	r.WriteString(" AS ")
-	r.ident(ref.b.alias)
+	alias, ok := r.scope[ref.b]
+	if !ok {
+		r.fail(fmt.Errorf("table binding is outside query scope"))
+		return
+	}
+	r.ident(alias)
+}
+
+// Long aliases must not rely on server truncation, which can collapse distinct
+// join paths. The fixed-width suffix is deterministic; scope checks still reject
+// any collision. Boundaries are bytes and never split a UTF-8 code point.
+func identifierAlias(name string, d Dialect) string {
+	limit := 0
+	if d == Postgres {
+		limit = 63
+	} else if d == MySQL {
+		limit = 64
+	}
+	if limit == 0 || len(name) <= limit {
+		return name
+	}
+	hash := uint64(14695981039346656037)
+	for i := 0; i < len(name); i++ {
+		hash ^= uint64(name[i])
+		hash *= 1099511628211
+	}
+	end := limit - 17
+	for end > 0 && !utf8.ValidString(name[:end]) {
+		end--
+	}
+	return name[:end] + fmt.Sprintf("_%016x", hash)
 }
 
 type columnNode struct {

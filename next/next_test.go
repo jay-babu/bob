@@ -56,11 +56,13 @@ func TestCompositionBindingsAndImmutability(t *testing.T) {
 	if _, err := base.Where(n.Field[int64](u.As("other"), "id").EQ(1)).Build(n.Postgres); err == nil {
 		t.Fatal("out-of-scope column accepted")
 	}
-	if _, err := base.Where(rel.Exists(a, posts.As("u"))).Build(n.Postgres); err == nil {
-		t.Fatal("shadowed alias accepted")
+	shadowed := build(t, base.Where(rel.Exists(a, posts.As("u"))), n.Postgres)
+	if !strings.Contains(shadowed.SQL, `AS "u_2"`) {
+		t.Fatal("independent bindings did not receive distinct SQL aliases")
 	}
-	if _, err := base.JoinOn(posts.As("u"), id.EQ(1), false).Build(n.Postgres); err == nil {
-		t.Fatal("duplicate alias accepted")
+	build(t, base.JoinOn(posts.As("u"), id.EQ(1), false), n.Postgres)
+	if _, err := base.JoinOn(a, id.EQ(1), false).Build(n.Postgres); err == nil {
+		t.Fatal("one binding used as two distinct table occurrences")
 	}
 	if _, err := base.Where(n.Field[int](a, "missing").EQ(1)).Build(n.Postgres); err == nil {
 		t.Fatal("unknown column accepted")

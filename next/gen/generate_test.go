@@ -16,13 +16,13 @@ func schema() gen.Schema {
 }
 func TestIncrementalGenerationOwnershipAndCleanup(t *testing.T) {
 	dir := t.TempDir()
-	config := gen.Config{Directory: dir, ImportPath: "example.org/models"}
+	config := gen.Config{Layout: gen.Tables, Directory: dir, ImportPath: "example.org/models"}
 	s := schema()
 	report, err := gen.Generate(s, config)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if report.Written != 2 {
+	if report.Written != 3 {
 		t.Fatal(report)
 	}
 	path := filepath.Join(dir, "users/table.bob.go")
@@ -34,7 +34,7 @@ func TestIncrementalGenerationOwnershipAndCleanup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if report.Written != 0 || report.Unchanged != 2 {
+	if report.Written != 0 || report.Unchanged != 3 {
 		t.Fatal(report)
 	}
 	after, _ := os.Stat(path)
@@ -88,7 +88,7 @@ func TestIncrementalGenerationOwnershipAndCleanup(t *testing.T) {
 func TestRelationshipFanoutDoesNotChangeRows(t *testing.T) {
 	s := schema()
 	dir := t.TempDir()
-	config := gen.Config{Directory: dir, ImportPath: "example.org/models"}
+	config := gen.Config{Layout: gen.Tables, Directory: dir, ImportPath: "example.org/models"}
 	if _, err := gen.Generate(s, config); err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +149,7 @@ func TestSchemaValidationAndPreflight(t *testing.T) {
 	if err := os.WriteFile(path, []byte("user owned"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := gen.Generate(schema(), gen.Config{Directory: dir, ImportPath: "example.org/models"}); err == nil {
+	if _, err := gen.Generate(schema(), gen.Config{Layout: gen.Tables, Directory: dir, ImportPath: "example.org/models"}); err == nil {
 		t.Fatal("unowned file overwritten")
 	}
 	data, _ := os.ReadFile(path)
@@ -161,14 +161,14 @@ func TestSchemaValidationAndPreflight(t *testing.T) {
 func TestInterruptedPublicationCanBeRepaired(t *testing.T) {
 	s := schema()
 	dir := t.TempDir()
-	config := gen.Config{Directory: dir, ImportPath: "example.org/models"}
+	config := gen.Config{Layout: gen.Tables, Directory: dir, ImportPath: "example.org/models"}
 	if _, err := gen.Generate(s, config); err != nil {
 		t.Fatal(err)
 	}
 	s.Tables[0].Info.Columns = append(s.Tables[0].Info.Columns, next.ColumnInfo{Name: "added"})
 	s.Tables[0].Columns = append(s.Tables[0].Columns, gen.Column{Name: "added", GoName: "Added", GoType: "string"})
 	proposal := t.TempDir()
-	if _, err := gen.Generate(s, gen.Config{Directory: proposal, ImportPath: config.ImportPath}); err != nil {
+	if _, err := gen.Generate(s, gen.Config{Layout: gen.Tables, Directory: proposal, ImportPath: config.ImportPath}); err != nil {
 		t.Fatal(err)
 	}
 	// Publish one file, leaving the old manifest as an interrupted run would.
@@ -192,7 +192,7 @@ func TestCustomSQLTypesShareNullableImport(t *testing.T) {
 	s.Tables[0].Columns[2].GoType = "dbsql.RawBytes"
 	s.Tables[0].Imports = []string{`dbsql "database/sql"`}
 	dir := t.TempDir()
-	if _, err := gen.Generate(s, gen.Config{Directory: dir, ImportPath: "example.org/models"}); err != nil {
+	if _, err := gen.Generate(s, gen.Config{Layout: gen.Tables, Directory: dir, ImportPath: "example.org/models"}); err != nil {
 		t.Fatal(err)
 	}
 	code, err := os.ReadFile(filepath.Join(dir, "users/table.bob.go"))
@@ -201,5 +201,38 @@ func TestCustomSQLTypesShareNullableImport(t *testing.T) {
 	}
 	if strings.Count(string(code), `"database/sql"`) != 1 || !strings.Contains(string(code), "dbsql.Null[dbsql.RawBytes]") {
 		t.Fatal(string(code))
+	}
+}
+
+func TestSwitchingLayoutsOwnsOnlyGeneratedFiles(t *testing.T) {
+	dir := t.TempDir()
+	s := schema()
+	config := gen.Config{Directory: dir, ImportPath: "example.org/models"}
+	if _, err := gen.Generate(s, config); err != nil {
+		t.Fatal(err)
+	}
+	flat := filepath.Join(dir, "users.bob.go")
+	if _, err := os.Stat(flat); err != nil {
+		t.Fatal(err)
+	}
+	config.Layout = gen.Tables
+	if _, err := gen.Generate(s, config); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(flat); !os.IsNotExist(err) {
+		t.Fatal("old flat output survived a layout switch")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "users/table.bob.go")); err != nil {
+		t.Fatal(err)
+	}
+	config.Layout = gen.Flat
+	if _, err := gen.Generate(s, config); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(flat); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "users/table.bob.go")); !os.IsNotExist(err) {
+		t.Fatal("old table output survived a layout switch")
 	}
 }

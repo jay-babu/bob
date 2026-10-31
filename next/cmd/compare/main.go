@@ -9,12 +9,13 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	legacy "github.com/stephenafamo/bob/gen"
 	"github.com/stephenafamo/bob/gen/drivers"
 	"github.com/stephenafamo/bob/gen/plugins"
+	"github.com/stephenafamo/bob/next"
 	compact "github.com/stephenafamo/bob/next/gen"
-	adapter "github.com/stephenafamo/bob/next/gen/driver"
 )
 
 type fixtureDriver struct {
@@ -113,11 +114,16 @@ func main(){var db *sql.DB; rows,err:=owner.PublicOwners.Query().All(context.Bac
 			}
 		} else {
 			info, _ := f.Assemble(context.Background())
-			s, err := adapter.FromBob(info, f.Types(), nil)
-			if err != nil {
-				return err
+			s := compact.Schema{Version: compact.Version}
+			for _, table := range info.Tables {
+				t := compact.Table{Key: table.Key, Package: strings.ToLower(compact.Identifier(table.Key)), Info: next.TableInfo{Schema: table.Schema, Name: table.Name, PrimaryKey: table.Constraints.Primary.Columns}}
+				for _, column := range table.Columns {
+					t.Info.Columns = append(t.Info.Columns, next.ColumnInfo{Name: column.Name, DBType: column.DBType})
+					t.Columns = append(t.Columns, compact.Column{Name: column.Name, GoName: compact.Identifier(column.Name), GoType: column.Type})
+				}
+				s.Tables = append(s.Tables, t)
 			}
-			if _, err = compact.Generate(s, compact.Config{Directory: out, ImportPath: "example.org/bobbench/models"}); err != nil {
+			if _, err := compact.Generate(s, compact.Config{Layout: compact.Tables, Directory: out, ImportPath: "example.org/bobbench/models"}); err != nil {
 				return err
 			}
 			main := `package main

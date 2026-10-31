@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -18,11 +19,11 @@ func TestInvalidTypedProgramsDoNotCompile(t *testing.T) {
 	}
 	root := filepath.Dir(cwd)
 	for name, body := range map[string]string{
-		"wrong comparison type":           `u:=users.As("u");_ = u.Name.EQ(123)`,
-		"wrong update type":               `_ = users.Update{Name:next.Set(123)}`,
-		"nullable into nonnullable input": `_ = users.Update{Name:next.Null[string]()}`,
-		"wrong cursor type":               `u:=users.As("u");_ = next.Cursor(u.ID,"wrong",false)`,
-		"readonly generated column":       `u:=users.As("u");_ = u.Fingerprint.Set(2)`,
+		"wrong comparison type":           `u:=models.UsersAs("u");_ = u.Name.EQ(123)`,
+		"wrong update type":               `_ = models.UsersUpdate{Name:next.Set(123)}`,
+		"nullable into nonnullable input": `_ = models.UsersUpdate{Name:next.Null[string]()}`,
+		"wrong cursor type":               `u:=models.UsersAs("u");_ = next.Cursor(u.ID,"wrong",false)`,
+		"readonly generated column":       `u:=models.UsersAs("u");_ = u.Fingerprint.Set(2)`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -31,16 +32,16 @@ func TestInvalidTypedProgramsDoNotCompile(t *testing.T) {
 				t.Fatal(err)
 			}
 			source := `package typecheck
-import("github.com/stephenafamo/bob/next";"github.com/stephenafamo/bob/next/examples/models/users")
+import("github.com/stephenafamo/bob/next";"github.com/stephenafamo/bob/next/examples/models")
 var _ = next.Postgres
-var _ = users.Table
+var _ = models.UsersTable
 func invalid(){` + body + "}\n"
 			if err := os.WriteFile(filepath.Join(dir, "invalid.go"), []byte(source), 0o644); err != nil {
 				t.Fatal(err)
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
-			cmd := exec.CommandContext(ctx, "go", "test", "-mod=mod", ".")
+			cmd := exec.CommandContext(ctx, filepath.Join(runtime.GOROOT(), "bin", "go"), "test", "-mod=mod", ".")
 			cmd.Dir = dir
 			cmd.Env = append(os.Environ(), "GOWORK=off", "GOTOOLCHAIN=local")
 			output, err := cmd.CombinedOutput()

@@ -1,6 +1,7 @@
 {
-  "posts/table.bob.go": "03606831ba8e5d84a9262b372a775017da661a70d3a3a47b0139cdeec29e49c6",
-  "relations/postsuser/relation.bob.go": "3731dab5c5cb16e5fedc191ee95fd2bdf284353d7cac838bcec39b4ffa5e541d",
+  "go-bindings.json": "71e09fc5656fe56225823ba27f35a4e4d10e182c05ac9ac4cf423f9c2cba40c7",
+  "posts.bob.go": "f5aadb0a8853c4bef67f0a9065e2d59ef25275fa21bb48faea2879ccbdb94fd6",
+  "relations/postsuser/relation.bob.go": "9f451fc479ff13921ae4d42992c99c436f4bb9ffcdc11d1d6c48f7097000e838",
   "schema.json": "34c345c6cf9371a2f00ebb8e1b46a3b5ff2b9cb239580832c81e267ddbd7f831",
-  "users/table.bob.go": "b660017e8afc93af7ac464eedd09df926d936a6541a543bc46bd7af518a37309"
+  "users.bob.go": "3cd0358176c067b80623a3a45daca0710f77d190fccab3ab2080575ec2d76a2c"
 }

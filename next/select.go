@@ -89,7 +89,7 @@ func (q SelectQuery) Build(d Dialect) (Statement, error) {
 	}
 	cols := make([]string, len(q.columns))
 	for i, c := range q.columns {
-		cols[i] = c.label
+		cols[i] = identifierAlias(c.label, d)
 		if cols[i] == "" {
 			if n, ok := c.node.(columnNode); ok {
 				cols[i] = n.name
@@ -130,13 +130,23 @@ func (q SelectQuery) write(r *renderer) {
 			r.fail(fmt.Errorf("table reference requires a table and alias"))
 			return
 		}
-		for b, alias := range r.scope {
-			if b == ref.b || alias == ref.b.alias {
-				r.fail(fmt.Errorf("duplicate or shadowed table alias %s", alias))
-				return
-			}
+		if _, exists := r.scope[ref.b]; exists {
+			r.fail(fmt.Errorf("the same table binding cannot represent two table occurrences"))
+			return
 		}
-		r.scope[ref.b] = ref.b.alias
+		bounded := identifierAlias(ref.b.alias, r.dialect)
+		used := func(name string) bool {
+			for _, alias := range r.scope {
+				if alias == name {
+					return true
+				}
+			}
+			return false
+		}
+		for suffix := 2; used(bounded); suffix++ {
+			bounded = identifierAlias(fmt.Sprintf("%s_%d", ref.b.alias, suffix), r.dialect)
+		}
+		r.scope[ref.b] = bounded
 	}
 	add(q.from)
 	for _, j := range q.joins {
@@ -153,7 +163,7 @@ func (q SelectQuery) write(r *renderer) {
 		r.expr(c.node)
 		if c.label != "" {
 			r.WriteString(" AS ")
-			r.ident(c.label)
+			r.ident(identifierAlias(c.label, r.dialect))
 		}
 	}
 	r.WriteString(" FROM ")
@@ -162,7 +172,7 @@ func (q SelectQuery) write(r *renderer) {
 	full := r.scope
 	r.scope = maps.Clone(outer)
 	if q.from.b != nil {
-		r.scope[q.from.b] = q.from.b.alias
+		r.scope[q.from.b] = full[q.from.b]
 	}
 	for _, j := range q.joins {
 		if j.left {
@@ -170,10 +180,10 @@ func (q SelectQuery) write(r *renderer) {
 		} else {
 			r.WriteString(" INNER JOIN ")
 		}
-		r.ref(j.ref)
 		if j.ref.b != nil {
-			r.scope[j.ref.b] = j.ref.b.alias
+			r.scope[j.ref.b] = full[j.ref.b]
 		}
+		r.ref(j.ref)
 		r.WriteString(" ON ")
 		r.expr(j.on.node)
 	}

@@ -81,6 +81,9 @@ func (m Mutation) Build(d Dialect) (Statement, error) {
 		return Statement{}, fmt.Errorf("mutation requires a table reference and alias")
 	}
 	t := m.ref.b.table
+	if t.info.ReadOnly {
+		return Statement{}, fmt.Errorf("table is read-only")
+	}
 	if t.err != nil {
 		return Statement{}, t.err
 	}
@@ -96,7 +99,7 @@ func (m Mutation) Build(d Dialect) (Statement, error) {
 	if m.conflict != nil && m.kind != insertKind {
 		return Statement{}, fmt.Errorf("ON CONFLICT is only valid for inserts")
 	}
-	r := &renderer{dialect: d, scope: map[*binding]string{m.ref.b: m.ref.b.alias}}
+	r := &renderer{dialect: d, scope: map[*binding]string{m.ref.b: identifierAlias(m.ref.b.alias, d)}}
 	sets := make([]Assignment, 0, len(m.sets))
 	seen := map[string]bool{}
 	for _, a := range m.sets {
@@ -207,8 +210,8 @@ func (m Mutation) Build(d Dialect) (Statement, error) {
 			}
 			if c.label != "" {
 				r.WriteString(" AS ")
-				r.ident(c.label)
-				cols[i] = c.label
+				r.ident(identifierAlias(c.label, d))
+				cols[i] = identifierAlias(c.label, d)
 			}
 		}
 	}

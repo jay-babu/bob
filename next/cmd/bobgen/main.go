@@ -16,13 +16,14 @@ func main() {
 	directory := flag.String("out", "models", "generated package directory")
 	importPath := flag.String("import", "", "Go import path of the output directory")
 	relations := flag.String("relations", "", "comma-separated relationship allowlist")
+	layout := flag.String("layout", gen.Flat, "flat or tables")
 	flag.Parse()
-	if err := run(*source, *directory, *importPath, *relations); err != nil {
+	if err := run(*source, *directory, *importPath, *relations, *layout); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
-func run(source, directory, importPath, relations string) error {
+func run(source, directory, importPath, relations string, layouts ...string) error {
 	f, err := os.Open(source)
 	if err != nil {
 		return err
@@ -36,11 +37,21 @@ func run(source, directory, importPath, relations string) error {
 	}
 	var allow []string
 	if relations != "" {
-		for _, name := range strings.Split(relations, ",") {
-			allow = append(allow, strings.TrimSpace(name))
+		if relations == "all" {
+			for _, relation := range schema.Relations {
+				allow = append(allow, relation.Name)
+			}
+		} else {
+			for _, name := range strings.Split(relations, ",") {
+				allow = append(allow, strings.TrimSpace(name))
+			}
 		}
 	}
-	report, err := gen.Generate(schema, gen.Config{Directory: directory, ImportPath: importPath, Relations: allow})
+	layout := gen.Flat
+	if len(layouts) > 0 {
+		layout = layouts[0]
+	}
+	report, err := gen.Generate(schema, gen.Config{Directory: directory, ImportPath: importPath, Relations: allow, Layout: layout})
 	if err != nil {
 		return err
 	}

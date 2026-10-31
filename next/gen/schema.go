@@ -19,6 +19,17 @@ type Schema struct {
 	Version   int        `json:"version"`
 	Tables    []Table    `json:"tables"`
 	Relations []Relation `json:"relations,omitempty"`
+	Types     []Type     `json:"types,omitempty"`
+}
+
+// Type represents a database enum, domain, or opaque textual SQL type. Each
+// receives its own package so changes do not invalidate unrelated schema types.
+type Type struct {
+	Package string   `json:"package"`
+	Kind    string   `json:"kind"`
+	Base    string   `json:"base,omitempty"`
+	Imports []string `json:"imports,omitempty"`
+	Values  []string `json:"values,omitempty"`
 }
 type Table struct {
 	Key     string         `json:"key"`
@@ -46,7 +57,15 @@ type Config struct {
 	Directory  string
 	ImportPath string
 	Relations  []string
+	// Layout defaults to flat. Tables is available for narrow service imports.
+	Layout  string
+	Package string
 }
+
+const (
+	Flat   = "flat"
+	Tables = "tables"
+)
 
 func Identifier(s string) string {
 	var b strings.Builder
@@ -78,6 +97,26 @@ func (s Schema) Validate() error {
 	}
 	keys := map[string]Table{}
 	packages := map[string]bool{}
+	typePackages := map[string]bool{}
+	for _, typ := range s.Types {
+		if !validName(typ.Package) || typePackages[typ.Package] {
+			return fmt.Errorf("invalid or repeated schema-type package %s", typ.Package)
+		}
+		typePackages[typ.Package] = true
+		switch typ.Kind {
+		case "enum":
+			if len(typ.Values) == 0 {
+				return fmt.Errorf("enum %s has no values", typ.Package)
+			}
+		case "domain":
+			if _, err := parser.ParseExpr(typ.Base); err != nil || typ.Base == "" {
+				return fmt.Errorf("invalid domain base for %s", typ.Package)
+			}
+		case "text":
+		default:
+			return fmt.Errorf("unknown schema type kind %s", typ.Kind)
+		}
+	}
 	for _, t := range s.Tables {
 		if t.Key == "" || !validName(t.Package) || packages[t.Package] {
 			return fmt.Errorf("invalid or duplicate package for table %s", t.Key)
