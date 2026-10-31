@@ -1,0 +1,6 @@
+{
+  "posts/table.bob.go": "03606831ba8e5d84a9262b372a775017da661a70d3a3a47b0139cdeec29e49c6",
+  "relations/postsuser/relation.bob.go": "3731dab5c5cb16e5fedc191ee95fd2bdf284353d7cac838bcec39b4ffa5e541d",
+  "schema.json": "34c345c6cf9371a2f00ebb8e1b46a3b5ff2b9cb239580832c81e267ddbd7f831",
+  "users/table.bob.go": "b660017e8afc93af7ac464eedd09df926d936a6541a543bc46bd7af518a37309"
+}
