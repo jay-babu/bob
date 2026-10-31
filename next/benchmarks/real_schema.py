@@ -98,10 +98,14 @@ def main():
     source = args.models.resolve()
     old = args.legacy_models.resolve()
     workspace = args.legacy_workspace.resolve()
-    output = (args.out or Path(tempfile.mkdtemp(prefix="bob-real-build-"))).resolve()
+    storage = Path.home() / ".cache/bob-next-benchmarks"
+    storage.mkdir(parents=True, exist_ok=True)
+    output = (args.out or Path(tempfile.mkdtemp(prefix="bob-real-build-", dir=storage))).resolve()
     output.mkdir(parents=True, exist_ok=True)
     if any(output.iterdir()):
         raise ValueError("benchmark output must be empty")
+    if shutil.disk_usage(output).free < 20 * 1024**3:
+        raise ValueError("real-schema builds require at least 20 GiB of disk headroom; avoid a small /tmp filesystem")
     schema = json.loads((source / "schema.json").read_text())
     binding_info = json.loads((source / "go-bindings.json").read_text())
     bindings = binding_info["tables"]
@@ -146,7 +150,7 @@ def main():
                 expression = f"r,_ := {alias}.{old_tables[key]['name']}.Query().All(ctx,runtime.NewDB(db));return len(r)"
             else:
                 factory = bindings[key]["as"]
-                expression = f'c:={alias}.{factory}("r");p:=c.Projection();r,_:=runtime.All(ctx,runtime.NewSession(db,runtime.Postgres,nil),runtime.Select(c.Ref,p.Columns...),p);return len(r)'
+                expression = f'c:={alias}.{factory}("r");ctx=runtime.WithExecutor(ctx,db,runtime.ExecutionConfig{{}});r,_:=c.Query().AllContext(ctx);return len(r)'
             functions.append(f"//go:noinline\nfunc read{i}(ctx context.Context,db *sql.DB)int{{{expression}}}")
         calls = ";".join(f"total+=read{i}(ctx,db)" for i in range(len(shared)))
         body = f"func read(ctx context.Context,db *sql.DB)int{{if db==nil{{return 0}};total:=0;{calls};return total}}\nfunc main(){{fmt.Print(read(context.Background(),nil))}}\n"
@@ -156,7 +160,9 @@ def main():
         report["results"][mode] = results
         cache = output / (mode + "-cache")
         cache.mkdir()
-        env = dict(os.environ, GOWORK=str(work), GOCACHE=str(cache), GOTOOLCHAIN="local", GOPROXY="off")
+        temporary = output / (mode + "-work")
+        temporary.mkdir()
+        env = dict(os.environ, GOWORK=str(work), GOCACHE=str(cache), GOTMPDIR=str(temporary), TMPDIR=str(temporary), GOTOOLCHAIN="local", GOPROXY="off")
         for phase in ["clean", "warm", "application_edit"]:
             if phase == "application_edit":
                 with (folder / "main.go").open("a") as app:

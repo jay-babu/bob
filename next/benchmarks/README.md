@@ -14,6 +14,15 @@ imported by the read consumer.
 
 ## Real schema result
 
+**The historical timing runs below are invalidated and require a rerun.** The
+original benchmark filled its temporary filesystem. The failed baseline attempts
+therefore do not establish a Bob compiler failure, and the timing table must not
+be used to claim speed or memory improvements. Generated source byte counts are
+independent of that failure, but correspond to an earlier generator revision.
+The harness now requires disk headroom and keeps caches and Go work files on
+persistent storage. Application migrations must also measure the actual service,
+with no legacy generated model imports left in its dependency graph.
+
 | Metric | Existing layer | Default flat layout | Optional table layout |
 | --- | ---: | ---: | ---: |
 | Generated Go bytes | 15,178,110 | 2,077,629 | 1,980,889 |
@@ -25,16 +34,17 @@ imported by the read consumer.
 | Clean maximum process RSS | 1,086,096 KiB before failure | 672,848 KiB | 563,720 KiB |
 | Clean sampled process-tree RSS | Not captured reliably in first run | 705,112 KiB | 717,780 KiB |
 
-The existing layer exited unsuccessfully in both default and serial package
+The historical existing-layer attempts exited unsuccessfully in both default and serial package
 compilation: after 396.51 seconds by default and 465.59 seconds with `-p 1`.
-No compiler diagnostics were captured. The failure cause was not established, so
-it is not labeled an OOM. These are censored build attempts, not successful
-baseline timings. No real-schema baseline executable-size ratio is claimed.
+No compiler diagnostics were captured. Temporary-storage exhaustion was later
+identified as a confounder, invalidating those attempts. They are not successful
+baseline timings, evidence of an OOM, or evidence that the existing layer cannot
+build. No real-schema baseline executable-size ratio is claimed.
 
 The default flat output needs approximately 86% less generated Go than the
 existing layer while retaining the previously excluded table and FK metadata.
-Its lower package count improved the whole-schema consumer's clean and app-edit
-builds. Table layout has a smaller largest compiler process and offers narrower
+Its lower package count is intended to reduce build work; a valid timing
+comparison remains required. Table layout offers narrower
 imports and schema-change caching for small services. Neither layout drops
 relationships or forces callers into one-way navigation.
 
