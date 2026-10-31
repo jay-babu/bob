@@ -130,7 +130,7 @@ func (s Schema) Validate() error {
 			return fmt.Errorf("table %s has incomplete column metadata", t.Key)
 		}
 		names := map[string]bool{}
-		fields := map[string]bool{"Ref": true, "Projection": true, "Assignments": true}
+		fields := map[string]bool{"Ref": true, "Projection": true, "Assignments": true, "Query": true}
 		for i, c := range t.Columns {
 			if c.Name == "" || c.Name != t.Info.Columns[i].Name || names[c.Name] || !validName(c.GoName) || !unicode.IsUpper([]rune(c.GoName)[0]) || fields[c.GoName] {
 				return fmt.Errorf("invalid or conflicting column mapping %s.%s", t.Key, c.Name)

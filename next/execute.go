@@ -23,6 +23,27 @@ var _ Executor = (*sql.Tx)(nil)
 
 type Scanner interface{ Scan(...any) error }
 
+// Rows is the cursor contract shared by database/sql and native driver adapters.
+type Rows interface {
+	Scanner
+	Columns() ([]string, error)
+	Next() bool
+	Close() error
+	Err() error
+}
+
+// RowsExecutor lets integrations retain their existing driver and transaction.
+type RowsExecutor interface {
+	QueryRowsContext(context.Context, string, ...any) (Rows, error)
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}
+
+type sqlExecutor struct{ Executor }
+
+func (e sqlExecutor) QueryRowsContext(ctx context.Context, query string, args ...any) (Rows, error) {
+	return e.QueryContext(ctx, query, args...)
+}
+
 // Projection requires an explicit result shape. Generated full-row projections
 // select every field; custom projections use their own destination struct.
 type Projection[T any] struct {
@@ -43,7 +64,7 @@ type Event struct {
 type Observer func(context.Context, Event)
 
 type Session struct {
-	executor Executor
+	executor RowsExecutor
 	dialect  Dialect
 	observer Observer
 	inTx     bool
@@ -51,7 +72,7 @@ type Session struct {
 
 func NewSession(exec Executor, dialect Dialect, observer Observer) Session {
 	_, tx := exec.(*sql.Tx)
-	return Session{exec, dialect, observer, tx}
+	return Session{sqlExecutor{exec}, dialect, observer, tx}
 }
 
 func (s Session) observe(ctx context.Context, stmt Statement, start time.Time, rows int64, err error) {
@@ -176,7 +197,7 @@ func (s Session) each(ctx context.Context, q Buildable, columns []Selection, con
 	if err != nil {
 		return err
 	}
-	rows, err := s.executor.QueryContext(ctx, stmt.SQL, args...)
+	rows, err := s.executor.QueryRowsContext(ctx, stmt.SQL, args...)
 	if err != nil {
 		return Classify(err)
 	}

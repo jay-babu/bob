@@ -61,6 +61,7 @@ func (c UsersColumns) Projection() next.Projection[*UsersRow] {
 		return v, err
 	}}
 }
+func (c UsersColumns) Query() next.RowQuery[*UsersRow] { return next.FullRows(c.Ref, c.Projection()) }
 
 type UsersInsert struct {
 	ID      int64

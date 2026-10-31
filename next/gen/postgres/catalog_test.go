@@ -35,7 +35,7 @@ func TestCatalogAndGeneratedTypes(t *testing.T) {
 		`CREATE SCHEMA inventory`,
 		`CREATE TYPE inventory.status AS ENUM ('new','in-progress','NULL','value')`,
 		`CREATE DOMAIN inventory.identifier AS text NOT NULL DEFAULT 'unset' CHECK (VALUE <> '')`,
-		`CREATE TABLE inventory.thing(id inventory.identifier PRIMARY KEY,state inventory.status NOT NULL,prices numeric[] NOT NULL,tags inventory.status[],spans int4range, peer_id inventory.identifier, "row" text, "table" text, "columns" text, "insert" text)`,
+		`CREATE TABLE inventory.thing(id inventory.identifier PRIMARY KEY,state inventory.status NOT NULL,prices numeric[] NOT NULL,tags inventory.status[],spans int4range, peer_id inventory.identifier, "row" text, "table" text, "columns" text, "insert" text, "query" text)`,
 		`CREATE UNIQUE INDEX thing_state_unique ON inventory.thing(state) INCLUDE(prices)`,
 		`CREATE TABLE inventory.peer(id inventory.identifier PRIMARY KEY,thing_id inventory.identifier REFERENCES inventory.thing(id) DEFERRABLE INITIALLY DEFERRED)`,
 		`ALTER TABLE inventory.thing ADD FOREIGN KEY(peer_id) REFERENCES inventory.peer(id) DEFERRABLE INITIALLY DEFERRED`,
@@ -121,6 +121,7 @@ if _,err:=tx.Exec(ctx,n.SQL("INSERT INTO inventory.peer(id,thing_id) VALUES($1,$
 row,err:=n.One(ctx,tx,n.Insert(c.Ref,input.Assignments(c)...).Returning(p.Columns...),p);if err!=nil{return err}
 if row.Id.V!="one"||row.State!=status.New||row.Prices.Elements[0].V.String()!="12.3400"||row.Prices.Elements[1].Valid||!row.Tags.Valid||row.Tags.V.Elements[0].V!=status.InProgress||row.Tags.V.Elements[1].Valid||row.Spans.V!=span.Value("[1,5)"){t.Fatal("generated SQL types changed in round trip")};return nil
 });if err!=nil{t.Fatal(err)}
+ctx=n.WithExecutor(ctx,db,n.ExecutionConfig{});row,err:=c.Query().Where(c.Id.EQ(key("one"))).OneContext(ctx);if err!=nil{t.Fatal(err)};if row.QueryValue.Valid||row.State!=status.New{t.Fatal("full row query lost generated fields")}
 }
 `
 		if layout == gen.Flat {

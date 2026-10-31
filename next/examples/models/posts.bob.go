@@ -50,6 +50,7 @@ func (c PostsColumns) Projection() next.Projection[*PostsRow] {
 		return v, err
 	}}
 }
+func (c PostsColumns) Query() next.RowQuery[*PostsRow] { return next.FullRows(c.Ref, c.Projection()) }
 
 type PostsInsert struct {
 	ID     int64

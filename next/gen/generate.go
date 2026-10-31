@@ -313,7 +313,7 @@ func renderTable(t Table) ([]byte, error) {
 	for _, c := range t.Columns {
 		fmt.Fprintf(&b, "&v.%s,", c.GoName)
 	}
-	b.WriteString(");return v,err}}}\n")
+	b.WriteString(");return v,err}}}\nfunc (c Columns) Query() next.RowQuery[*Row] {return next.FullRows(c.Ref,c.Projection())}\n")
 	for _, kind := range []string{"Insert", "Update"} {
 		if t.Info.ReadOnly {
 			break

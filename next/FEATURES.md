@@ -11,8 +11,8 @@ separates useful behavior from measures introduced to make a large schema compil
 | PostgreSQL identifier limits | Deterministic bounded aliases and result labels retain UTF-8 boundaries and distinguish long paths. |
 | JSON v2 defaults | Structured `JSON[T]` uses v2 defaults, including duplicate-member rejection and nil collection defaults. |
 | Independent JSON scan results | Decoding uses fresh storage so reused scan targets cannot mutate earlier maps/slices or retain omitted fields. |
-| Execution in an existing transaction | An explicit Session carries the executor through queries and loaders; there is no implicit pool fallback. |
-| Typed scanners and projections | Generated scanners map full rows directly. Custom result types have explicit ordered projections. |
+| Execution in an existing transaction | Full-row reads and writes resolve a context-bound executor. The optional Bob adapter binds DBExec's existing pgx executor for both APIs. Lower-level explicit execution remains available; there is no pool fallback. |
+| Typed full-row reads | Generated `Query()` bindings retain the row type and scanner through composition. Callers use `AllContext` or `OneContext` without passing a session or projection. Custom result types remain a lower-level option. |
 | Nested/expand-style data access | Explicit, composable bounded loaders and full relationship metadata support application-owned expansion plans; field access never performs SQL. |
 | Typed predicates across reads and writes | One expression representation works for SELECT/UPDATE/DELETE without per-operation generated filter families. |
 

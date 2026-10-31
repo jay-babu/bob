@@ -5,7 +5,7 @@ compatibility with the previous Bob contracts is not a design constraint. The
 previous implementation remains available as a benchmark baseline.
 
 The targets are small generated code, predictable compilation, a small linked
-runtime, explicit result shapes and SQL whose cardinality is visible to callers.
+runtime, full-row reads and SQL whose cardinality is visible to callers.
 Database constraints remain the authority for concurrency and data integrity.
 
 ## Architecture
@@ -99,11 +99,38 @@ go test -short ./next/...
 
 ```go
 u := models.UsersAs("u")
-p := u.Projection()
-q := next.Select(u.Ref, p.Columns...).
-    Where(u.Tenant.EQ(tenantID)).OrderBy(u.ID.Asc()).Limit(50)
-rows, err := next.All(ctx, session, q, p) // []*models.UsersRow
+rows, err := u.Query().
+    Where(u.Tenant.EQ(tenantID)).OrderBy(u.ID.Asc()).Limit(50).
+    AllContext(ctx) // []*models.UsersRow
 ```
+
+`Query()` attaches the generated full-row scanner automatically. Its shared
+`RowQuery[T]` wrapper keeps the row type through filters, joins, ordering and
+pagination. `OneContext`, `EachContext` and `CountContext` use the same binding.
+Normal table reads require neither a session nor an explicit projection.
+
+The database integration binds its executor once. With `database/sql`:
+
+```go
+ctx = next.WithExecutor(ctx, tx, next.ExecutionConfig{})
+```
+
+For Zeus-style DBExec, replace its existing `bob.WithExecutor` binding with the
+optional `next/bobexec` adapter at the transaction boundary:
+
+```go
+ctx = bobexec.WithExecutor(ctx, tx, next.ExecutionConfig{
+    Dialect: next.Postgres, InTransaction: true,
+})
+```
+
+This binds the same Bob executor for both APIs, including existing pgx wrappers,
+debug wrappers and auditing configuration. It does not open a connection or own
+commit/rollback. Existing `bob.WithExecutor` bindings alone do not bind next;
+the adapter must be installed at the integration boundary. Zeus integration is
+not included in this repository. Missing executors return `ErrNoExecutor`;
+nil bindings mask parent bindings and expired transactions never fall back to
+a pool. Contexts must stay within their executor's lifetime.
 
 Each table occurrence has a distinct binding. Out-of-scope references, reused table bindings and references to later joins
 fail when building SQL. Repeated alias hints receive distinct SQL names, so
@@ -174,7 +201,9 @@ explicit `AllRows`; an arbitrary predicate is not a proof of narrow authorizatio
 failed version predicate without another read. An unexpected multirow write is
 reported after execution: use a transaction when that outcome must roll back.
 
-An executor is explicit. `WithinTx` binds all callback operations to its
+Execution uses the context-bound executor or the lower-level explicit API.
+`ExecContext` and `ExecOneContext` execute writes without a session argument.
+`WithinTx` binds all callback operations to its
 transaction and rolls back on callback errors or panics. There are no hidden pool
 lookups, save-on-load hooks, automatic retries or transaction creation on reads.
 

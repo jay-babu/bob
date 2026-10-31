@@ -24,6 +24,7 @@ func TestInvalidTypedProgramsDoNotCompile(t *testing.T) {
 		"nullable into nonnullable input": `_ = models.UsersUpdate{Name:next.Null[string]()}`,
 		"wrong cursor type":               `u:=models.UsersAs("u");_ = next.Cursor(u.ID,"wrong",false)`,
 		"readonly generated column":       `u:=models.UsersAs("u");_ = u.Fingerprint.Set(2)`,
+		"wrong full row result":           `u:=models.UsersAs("u");var rows []*models.PostsRow;rows,_=u.Query().AllContext(context.Background());_ = rows`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -32,7 +33,8 @@ func TestInvalidTypedProgramsDoNotCompile(t *testing.T) {
 				t.Fatal(err)
 			}
 			source := `package typecheck
-import("github.com/stephenafamo/bob/next";"github.com/stephenafamo/bob/next/examples/models")
+import("context";"github.com/stephenafamo/bob/next";"github.com/stephenafamo/bob/next/examples/models")
+var _ = context.Background
 var _ = next.Postgres
 var _ = models.UsersTable
 func invalid(){` + body + "}\n"

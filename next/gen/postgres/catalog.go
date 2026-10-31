@@ -145,7 +145,7 @@ ORDER BY n.nspname,c.relname,a.attnum`, string(encoded), options.IncludePartitio
 		table.Info.Columns = append(table.Info.Columns, next.ColumnInfo{Name: column, DBType: dbType, Nullable: effectiveNullable, HasDefault: defaultExpr != "" || identity != "" || domainDefault, Generated: generated != "" || identity == "a"})
 		goName := gen.Identifier(column)
 		switch goName {
-		case "Ref", "Projection", "Assignments":
+		case "Ref", "Projection", "Assignments", "Query":
 			goName += "Value"
 		}
 		if goName == "" || slices.ContainsFunc(table.Columns, func(c gen.Column) bool { return c.GoName == goName }) {
