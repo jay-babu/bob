@@ -7,10 +7,13 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/stephenafamo/bob"
+	"github.com/stephenafamo/bob/dialect/psql"
+	"github.com/stephenafamo/bob/dialect/psql/sm"
 	bobpgx "github.com/stephenafamo/bob/drivers/pgx"
 	n "github.com/stephenafamo/bob/next"
 	"github.com/stephenafamo/bob/next/bobexec"
 	"github.com/stephenafamo/bob/next/examples/models"
+	"github.com/stephenafamo/bob/next/examples/models/relations/postsuser"
 	"github.com/stephenafamo/bob/next/internal/pgtest"
 )
 
@@ -18,6 +21,9 @@ func TestNativePGXContextUsesDBExecTransaction(t *testing.T) {
 	db := pgtest.Open(t)
 	ctx := context.Background()
 	if _, err := db.Exec(`CREATE TABLE users(id bigint NOT NULL,tenant bigint NOT NULL,name text NOT NULL,note text,version bigint NOT NULL DEFAULT 1,fingerprint bigint GENERATED ALWAYS AS(id*2) STORED,PRIMARY KEY(tenant,id))`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`CREATE TABLE posts(id bigint NOT NULL,tenant bigint NOT NULL,user_id bigint NOT NULL,title text NOT NULL,PRIMARY KEY(tenant,id))`); err != nil {
 		t.Fatal(err)
 	}
 	conn, err := pgx.Connect(ctx, pgtest.DSN(t, db))
@@ -46,6 +52,16 @@ func TestNativePGXContextUsesDBExecTransaction(t *testing.T) {
 	}
 	require(t, row.Name, input.Name)
 	require(t, row.Fingerprint, int64(2))
+	joined := psql.Select(sm.Columns(bobexec.Column(u.ID)), sm.From(bobexec.Table(models.UsersTable)).As("u"), bobexec.LeftJoin(postsuser.Relation.Reverse(), "u", "p"))
+	query, args, err := bob.Build(ctx, joined)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var joinedID int64
+	if err := tx.QueryRow(ctx, query, args...).Scan(&joinedID); err != nil {
+		t.Fatal(err)
+	}
+	require(t, joinedID, int64(1))
 	row, err = u.Query().Where(n.ILike(u.Name.Expr(), "%PRIVATE _ame")).OneContext(bound)
 	if err != nil {
 		t.Fatal(err)

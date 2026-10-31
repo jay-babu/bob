@@ -45,6 +45,7 @@ type Column struct {
 }
 type Relation struct {
 	Name        string   `json:"name"`
+	Constraint  string   `json:"constraint,omitempty"`
 	From        string   `json:"from"`
 	To          string   `json:"to"`
 	FromColumns []string `json:"from_columns"`

@@ -167,6 +167,12 @@ CTEs, window functions and other grammar without building a second execution
 path. It accepts native placeholders and never interpolates values. SQL-defined
 query result mappings are checked at runtime, not statically inferred from SQL.
 
+The optional `next/bobexec` integration exposes `Table`, `Column` and `LeftJoin`
+for advanced PostgreSQL builder queries. These consume compact schema descriptors,
+preserve composite FK columns, and need no legacy generated model packages.
+Aliases belong to the surrounding PostgreSQL builder on this path. The native
+full-row API retains its own scope and cardinality checks.
+
 ## Cardinality, loading and pagination
 
 `Relation.Exists` filters parents without multiplying them. `JoinRelation` uses

@@ -63,6 +63,11 @@ func TestCatalogAndGeneratedTypes(t *testing.T) {
 	if len(schema.Tables) != 4 || len(schema.Relations) != 2 || len(schema.Types) != 3 {
 		t.Fatalf("unexpected metadata: tables=%d relationships=%d types=%d", len(schema.Tables), len(schema.Relations), len(schema.Types))
 	}
+	for _, relation := range schema.Relations {
+		if relation.Constraint == "" {
+			t.Fatal("physical foreign-key identity is missing from schema metadata")
+		}
+	}
 	for _, table := range schema.Tables {
 		if table.Key == "inventory.thing" {
 			if table.Info.Columns[0].Nullable || !table.Info.Columns[0].HasDefault || len(table.Info.UniqueKeys) != 1 {

@@ -110,6 +110,14 @@ func (r Ref) Table() *Table {
 	return r.b.table
 }
 
+// Alias is the requested alias, before native query-scope disambiguation.
+func (r Ref) Alias() string {
+	if r.b == nil {
+		return ""
+	}
+	return r.b.alias
+}
+
 // Column carries the Go value type through comparisons and assignments. Query
 // scope and SQL operator compatibility are validated separately.
 type Column[T any] struct {
@@ -118,6 +126,8 @@ type Column[T any] struct {
 }
 
 func Field[T any](ref Ref, name string) Column[T] { return Column[T]{ref, name} }
+func (c Column[T]) Reference() Ref                { return c.ref }
+func (c Column[T]) Name() string                  { return c.name }
 func (c Column[T]) Expr() Expr[T]                 { return Expr[T]{node: columnNode{c.ref, c.name}} }
 func (c Column[T]) EQ(v T) Predicate              { return Equal(c.Expr(), Value(v)) }
 func (c Column[T]) NE(v T) Predicate              { return compare(c.Expr().node, "<>", Value(v).node) }

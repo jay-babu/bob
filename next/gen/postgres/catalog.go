@@ -199,7 +199,7 @@ WHERE con.contype IN ('p','u','f') AND n.nspname IN (SELECT jsonb_array_elements
 			table.Info.UniqueKeys = append(table.Info.UniqueKeys, local)
 		case "f":
 			if ti, ok := indices[target]; ok {
-				s.Relations = append(s.Relations, gen.Relation{Name: packageName(table.Key + "_" + name), From: table.Key, To: s.Tables[ti].Key, FromColumns: local, ToColumns: foreign})
+				s.Relations = append(s.Relations, gen.Relation{Name: packageName(table.Key + "_" + name), Constraint: name, From: table.Key, To: s.Tables[ti].Key, FromColumns: local, ToColumns: foreign})
 			}
 		}
 	}
