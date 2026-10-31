@@ -76,3 +76,20 @@ func ExecOneContext(ctx context.Context, q Buildable) error {
 	}
 	return s.ExecOne(ctx, q)
 }
+
+// AllContext executes an explicitly shaped query using the bound executor.
+// Full-row table reads normally use the generated c.Query().AllContext instead.
+func AllContext[T any](ctx context.Context, q Buildable, p Projection[T]) ([]T, error) {
+	s, err := sessionFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return All(ctx, s, q, p)
+}
+func OneContext[T any](ctx context.Context, q Buildable, p Projection[T]) (T, error) {
+	s, err := sessionFromContext(ctx)
+	if err != nil {
+		return *new(T), err
+	}
+	return One(ctx, s, q, p)
+}

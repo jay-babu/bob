@@ -373,3 +373,20 @@ func relationshipBatch(owner RowDescriptor, step RelationStep, parents []any) (B
 	}}
 	return SQL(strings.TrimSpace(r.String()), r.args...), projection, nil
 }
+
+// LoadRelationsContext loads a bounded plan after a SQL-defined parent query.
+// It uses the same externally owned transaction as ordinary row queries.
+func LoadRelationsContext[T any](ctx context.Context, plan RelationPlan, rows []T) error {
+	if plan.Owner.Table == nil {
+		return fmt.Errorf("relationship plan requires an owner")
+	}
+	q := FullRows(plan.Owner.Table.As("load_owner"), Projection[T]{}).WithRelations(plan)
+	if q.query.err != nil {
+		return q.query.err
+	}
+	s, err := sessionFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	return q.load(ctx, s, rows)
+}

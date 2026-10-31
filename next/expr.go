@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 )
 
@@ -27,7 +28,11 @@ type Order struct {
 	desc bool
 }
 
-func Value[T any](value T) Expr[T]                { return Expr[T]{valueNode{value}} }
+func Value[T any](value T) Expr[T] { return Expr[T]{valueNode{value}} }
+
+// CurrentTimestamp uses the database transaction clock rather than the caller's clock.
+func CurrentTimestamp() Expr[time.Time]           { return Expr[time.Time]{literalNode("CURRENT_TIMESTAMP")} }
+func Greater[T any](a, b Expr[T]) Predicate       { return compare(a.node, ">", b.node) }
 func Equal[T any](a, b Expr[T]) Predicate         { return compare(a.node, "=", b.node) }
 func compare(a node, op string, b node) Predicate { return Predicate{binaryNode{a, op, b}} }
 func And(ps ...Predicate) Predicate               { return combine("AND", ps) }

@@ -206,3 +206,17 @@ func TestBobExecutorBridgeKeepsSameTransaction(t *testing.T) {
 		}
 	}
 }
+
+func TestExplicitSQLUsesContextExecutorAndTypedScanner(t *testing.T) {
+	db := database(t)
+	ctx := n.WithExecutor(context.Background(), db, n.ExecutionConfig{Dialect: n.SQLite})
+	projection := n.Projection[int64]{Columns: []n.Selection{n.Value(int64(0)).Select("answer")}, Scan: func(s n.Scanner) (int64, error) { var value int64; err := s.Scan(&value); return value, err }}
+	rows, err := n.AllContext(ctx, n.SQL("SELECT 42 AS answer"), projection)
+	require(t, err, nil)
+	require(t, rows, []int64{42})
+	value, err := n.OneContext(ctx, n.SQL("SELECT 43 AS answer"), projection)
+	require(t, err, nil)
+	require(t, value, int64(43))
+	_, err = n.OneContext(context.Background(), n.SQL("SELECT 44"), projection)
+	require(t, errors.Is(err, n.ErrNoExecutor), true)
+}

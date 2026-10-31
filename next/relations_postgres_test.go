@@ -70,6 +70,14 @@ INSERT INTO posts VALUES(7,1,1,'one'),(7,2,1,'two'),(8,1,1,'private');`); err !=
 		require(t, parent.Tenant, int64(7))
 		require(t, parent.ID, int64(1))
 	}
+	custom, err := n.AllContext(ctx, n.SQL("SELECT tenant,id,name FROM people WHERE tenant=$1 AND id=$2", 7, 1), p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := n.LoadRelationsContext(ctx, plan, custom); err != nil {
+		t.Fatal(err)
+	}
+	require(t, len(n.RelatedMany[*relatedPost](&custom[0].Related, "posts")), 2)
 	// Parent paging stays independent of collection cardinality.
 	rows, err = base.WithRelations(plan).Offset(1).Limit(1).AllContext(ctx)
 	if err != nil {
