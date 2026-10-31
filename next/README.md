@@ -59,6 +59,11 @@ Views, materialized views and foreign tables are read-only in generated APIs.
 
 Enums, domains and opaque extension/range types receive independent packages.
 Domains retain distinct Go types and their inherited nullability/default facts.
+Schema documents can set a table's `go_name` and each column's `go_name`,
+`go_type` and optional `nullable_go_type`. These let applications keep domain IDs,
+exact decimal types, typed JSON and nullable value types independently of query
+APIs. Custom nullable types must support scanning. The PostgreSQL defaults remain
+unchanged when overrides are absent.
 Ordinary valid, nonpartial unique indexes are recognized, including indexes with
 INCLUDE columns; partial or expression indexes are not assumed to prove a
 column-based to-one relationship.

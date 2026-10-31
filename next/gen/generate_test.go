@@ -66,6 +66,28 @@ func TestPublicSchemaIsImplicitInFlatModelNames(t *testing.T) {
 func schema() gen.Schema {
 	return gen.Schema{Version: gen.Version, Tables: []gen.Table{{Key: "users", Package: "users", Info: next.TableInfo{Name: "users", PrimaryKey: []string{"id"}, Columns: []next.ColumnInfo{{Name: "id", HasDefault: true}, {Name: "name"}, {Name: "note", Nullable: true}, {Name: "computed", Generated: true}}}, Columns: []gen.Column{{Name: "id", GoName: "ID", GoType: "int64"}, {Name: "name", GoName: "Name", GoType: "string"}, {Name: "note", GoName: "Note", GoType: "string"}, {Name: "computed", GoName: "Computed", GoType: "int64"}}}}}
 }
+
+func TestApplicationValueTypesAndModelNames(t *testing.T) {
+	s := schema()
+	s.Tables[0].GoName = "Account"
+	s.Tables[0].Columns[2].NullableGoType = "*string"
+	dir := t.TempDir()
+	if _, err := gen.Generate(s, gen.Config{Directory: dir, ImportPath: "example.org/models"}); err != nil {
+		t.Fatal(err)
+	}
+	code, err := os.ReadFile(filepath.Join(dir, "users.bob.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(code), "type AccountRow struct") || !strings.Contains(strings.Join(strings.Fields(string(code)), " "), "Note *string") || strings.Contains(string(code), "sql.Null[") {
+		t.Fatal(string(code))
+	}
+	// An invalid override must be rejected before publishing any output.
+	s.Tables[0].Columns[2].NullableGoType = "not a type"
+	if _, err := gen.Generate(s, gen.Config{Directory: dir, ImportPath: "example.org/models"}); err == nil {
+		t.Fatal("invalid nullable Go type accepted")
+	}
+}
 func TestIncrementalGenerationOwnershipAndCleanup(t *testing.T) {
 	dir := t.TempDir()
 	config := gen.Config{Layout: gen.Tables, Directory: dir, ImportPath: "example.org/models"}

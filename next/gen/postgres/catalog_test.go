@@ -78,6 +78,17 @@ func TestCatalogAndGeneratedTypes(t *testing.T) {
 			t.Fatal("view is writable")
 		}
 	}
+	for i := range schema.Tables {
+		if schema.Tables[i].Key != "inventory.thing" {
+			continue
+		}
+		schema.Tables[i].Imports = append(schema.Tables[i].Imports, `null "github.com/aarondl/opt/null"`)
+		for j := range schema.Tables[i].Columns {
+			if schema.Tables[i].Columns[j].Name == "query" {
+				schema.Tables[i].Columns[j].NullableGoType = "null.Val[string]"
+			}
+		}
+	}
 	if err = tx.Commit(); err != nil {
 		t.Fatal(err)
 	}
@@ -120,13 +131,13 @@ func TestGeneratedRoundTrip(t *testing.T){
 db,err:=sql.Open("pgx",` + strconv.Quote(pgtest.DSN(t, db)) + `);if err!=nil{t.Fatal(err)};defer db.Close()
 ctx:=context.Background();c:=thing.As("t");p:=c.Projection();decimal,err:=n.ParseDecimal("12.3400");if err!=nil{t.Fatal(err)}
 key:=func(value string)identifier.Value{return identifier.Value{Domain:n.Domain[string]{V:value}}}
-input:=thing.Insert{Id:n.Set(key("one")),State:status.New,Prices:n.Array[n.Decimal]{Elements:[]sql.Null[n.Decimal]{{V:decimal,Valid:true},{}}},Tags:n.Nullable(n.Set(n.Array[status.Value]{Elements:[]sql.Null[status.Value]{{V:status.InProgress,Valid:true},{}}})),Spans:n.Nullable(n.Set(span.Value("[1,5)"))),PeerId:n.Set(key("peer"))}
+input:=thing.Insert{Id:n.Set(key("one")),State:status.New,Prices:n.Array[n.Decimal]{Elements:[]sql.Null[n.Decimal]{{V:decimal,Valid:true},{}}},Tags:n.Nullable(n.Set(n.Array[status.Value]{Elements:[]sql.Null[status.Value]{{V:status.InProgress,Valid:true},{}}})),Spans:n.Nullable(n.Set(span.Value("[1,5)"))),PeerId:n.Set(key("peer")),QueryValue:n.Nullable(n.Set("app-owned"))}
 err=n.WithinTx(ctx,db,n.Postgres,nil,nil,func(tx n.Session)error{
 if _,err:=tx.Exec(ctx,n.SQL("INSERT INTO inventory.peer(id,thing_id) VALUES($1,$2)","peer","one"));err!=nil{return err}
 row,err:=n.One(ctx,tx,n.Insert(c.Ref,input.Assignments(c)...).Returning(p.Columns...),p);if err!=nil{return err}
 if row.Id.V!="one"||row.State!=status.New||row.Prices.Elements[0].V.String()!="12.3400"||row.Prices.Elements[1].Valid||!row.Tags.Valid||row.Tags.V.Elements[0].V!=status.InProgress||row.Tags.V.Elements[1].Valid||row.Spans.V!=span.Value("[1,5)"){t.Fatal("generated SQL types changed in round trip")};return nil
 });if err!=nil{t.Fatal(err)}
-ctx=n.WithExecutor(ctx,db,n.ExecutionConfig{});row,err:=c.Query().Where(c.Id.EQ(key("one"))).OneContext(ctx);if err!=nil{t.Fatal(err)};if row.QueryValue.Valid||row.State!=status.New{t.Fatal("full row query lost generated fields")}
+ctx=n.WithExecutor(ctx,db,n.ExecutionConfig{});row,err:=c.Query().Where(c.Id.EQ(key("one"))).OneContext(ctx);if err!=nil{t.Fatal(err)};if row.QueryValue.GetOrZero()!="app-owned"||row.State!=status.New{t.Fatal("full row query lost application value types")}
 }
 `
 		if layout == gen.Flat {

@@ -34,14 +34,16 @@ type Type struct {
 type Table struct {
 	Key     string         `json:"key"`
 	Package string         `json:"package"`
+	GoName  string         `json:"go_name,omitempty"`
 	Info    next.TableInfo `json:"info"`
 	Columns []Column       `json:"columns"`
 	Imports []string       `json:"imports,omitempty"`
 }
 type Column struct {
-	Name   string `json:"name"`
-	GoName string `json:"go_name"`
-	GoType string `json:"go_type"`
+	Name           string `json:"name"`
+	GoName         string `json:"go_name"`
+	GoType         string `json:"go_type"`
+	NullableGoType string `json:"nullable_go_type,omitempty"`
 }
 type Relation struct {
 	Name        string   `json:"name"`
@@ -119,6 +121,9 @@ func (s Schema) Validate() error {
 		}
 	}
 	for _, t := range s.Tables {
+		if t.GoName != "" && (!validName(t.GoName) || !unicode.IsUpper([]rune(t.GoName)[0])) {
+			return fmt.Errorf("invalid Go model name for table %s", t.Key)
+		}
 		if t.Key == "" || !validName(t.Package) || packages[t.Package] {
 			return fmt.Errorf("invalid or duplicate package for table %s", t.Key)
 		}
@@ -138,6 +143,11 @@ func (s Schema) Validate() error {
 			}
 			if _, err := parser.ParseExpr(c.GoType); err != nil || c.GoType == "" {
 				return fmt.Errorf("invalid Go type for %s.%s", t.Key, c.Name)
+			}
+			if c.NullableGoType != "" {
+				if _, err := parser.ParseExpr(c.NullableGoType); err != nil || !t.Info.Columns[i].Nullable {
+					return fmt.Errorf("invalid nullable Go type for %s.%s", t.Key, c.Name)
+				}
 			}
 			names[c.Name] = true
 			fields[c.GoName] = true

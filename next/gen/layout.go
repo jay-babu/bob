@@ -25,6 +25,9 @@ type Binding struct {
 // public is the implicit SQL schema in client-facing model names. Preserve
 // custom namespaces and prefixes for every other schema.
 func flatPrefix(table Table) string {
+	if table.GoName != "" {
+		return table.GoName
+	}
 	name := table.Package
 	if table.Info.Schema == "public" {
 		name = strings.TrimPrefix(name, "public_")

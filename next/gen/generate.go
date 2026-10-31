@@ -234,8 +234,8 @@ func renderTable(t Table) ([]byte, error) {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%spackage %s\nimport (\n next %q\n", header, t.Package, runtimePath)
 	nullable := false
-	for _, c := range t.Info.Columns {
-		nullable = nullable || c.Nullable
+	for i, c := range t.Info.Columns {
+		nullable = nullable || (c.Nullable && t.Columns[i].NullableGoType == "")
 	}
 	imports := slices.Clone(t.Imports)
 	slices.Sort(imports)
@@ -280,7 +280,11 @@ func renderTable(t Table) ([]byte, error) {
 	for i, c := range t.Columns {
 		typ := c.GoType
 		if t.Info.Columns[i].Nullable {
-			typ = sqlAlias + ".Null[" + typ + "]"
+			if c.NullableGoType != "" {
+				typ = c.NullableGoType
+			} else {
+				typ = sqlAlias + ".Null[" + typ + "]"
+			}
 		}
 		fmt.Fprintf(&b, " %s %s\n", c.GoName, typ)
 	}
