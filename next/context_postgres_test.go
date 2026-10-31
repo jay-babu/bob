@@ -33,6 +33,9 @@ func TestNativePGXContextUsesDBExecTransaction(t *testing.T) {
 	var events []n.Event
 	bound := bobexec.WithExecutor(ctx, bobpgx.NewTx(tx, nil), n.ExecutionConfig{InTransaction: true, Observer: func(_ context.Context, event n.Event) { events = append(events, event) }})
 	u := models.UsersAs("u")
+	if _, err := u.Query().Where(n.ILike(u.Name.Expr(), "%name%")).Build(n.SQLite); err == nil {
+		t.Fatal("ILIKE accepted for a dialect without the same matching semantics")
+	}
 	input := models.UsersInsert{ID: 1, Tenant: 7, Name: "Private name"}
 	if err := n.ExecOneContext(bound, n.Insert(u.Ref, input.Assignments(u)...)); err != nil {
 		t.Fatal(err)
@@ -43,6 +46,11 @@ func TestNativePGXContextUsesDBExecTransaction(t *testing.T) {
 	}
 	require(t, row.Name, input.Name)
 	require(t, row.Fingerprint, int64(2))
+	row, err = u.Query().Where(n.ILike(u.Name.Expr(), "%PRIVATE _ame")).OneContext(bound)
+	if err != nil {
+		t.Fatal(err)
+	}
+	require(t, row.Name, input.Name)
 	// The original Bob executor sees exactly the same uncommitted transaction.
 	exec, err := bob.ExecutorFromContext(bound)
 	if err != nil {

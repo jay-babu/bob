@@ -67,6 +67,21 @@ func Like[T ~string](value Expr[T], pattern T) Predicate {
 	return compare(value.node, "LIKE", Value(pattern).node)
 }
 
+// ILike preserves PostgreSQL's case-insensitive matching and wildcard rules.
+func ILike[T ~string](value Expr[T], pattern T) Predicate {
+	return Predicate{ilikeNode{value.node, Value(pattern).node}}
+}
+
+type ilikeNode struct{ value, pattern node }
+
+func (n ilikeNode) write(r *renderer) {
+	if r.dialect != Postgres {
+		r.fail(fmt.Errorf("ILIKE requires PostgreSQL"))
+		return
+	}
+	binaryNode{n.value, "ILIKE", n.pattern}.write(r)
+}
+
 type Number interface {
 	~int | ~int8 | ~int16 | ~int32 | ~int64 | ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~float32 | ~float64 | Decimal
 }
