@@ -201,7 +201,14 @@ func (s Session) each(ctx context.Context, q Buildable, columns []Selection, con
 	if err != nil {
 		return Classify(err)
 	}
-	defer func() { err = errors.Join(err, rows.Close()) }()
+	defer func() {
+		closeErr := rows.Close()
+		// Native drivers may expose a server error only when closing an incomplete cursor.
+		if rowErr := rows.Err(); rowErr != nil && !errors.Is(err, rowErr) {
+			err = errors.Join(err, Classify(rowErr))
+		}
+		err = errors.Join(err, closeErr)
+	}()
 	actual, err := rows.Columns()
 	if err != nil {
 		return err

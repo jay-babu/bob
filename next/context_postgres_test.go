@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stephenafamo/bob"
 	"github.com/stephenafamo/bob/dialect/psql"
 	"github.com/stephenafamo/bob/dialect/psql/sm"
@@ -101,4 +102,38 @@ func TestNativePGXContextUsesDBExecTransaction(t *testing.T) {
 		t.Fatal(err)
 	}
 	require(t, count, int64(0))
+}
+
+func TestPGXReturningPreservesDatabaseConstraintErrors(t *testing.T) {
+	db := pgtest.Open(t)
+	ctx := context.Background()
+	if _, err := db.Exec(`CREATE TABLE users(id bigint NOT NULL,tenant bigint NOT NULL,name text NOT NULL,note text,version bigint NOT NULL DEFAULT 1,fingerprint bigint GENERATED ALWAYS AS(id*2) STORED,PRIMARY KEY(tenant,id))`); err != nil {
+		t.Fatal(err)
+	}
+	for _, mode := range []pgx.QueryExecMode{pgx.QueryExecModeCacheStatement, pgx.QueryExecModeExec, pgx.QueryExecModeSimpleProtocol} {
+		t.Run(mode.String(), func(t *testing.T) {
+			config, err := pgx.ParseConfig(pgtest.DSN(t, db))
+			if err != nil {
+				t.Fatal(err)
+			}
+			config.DefaultQueryExecMode = mode
+			conn, err := pgx.ConnectConfig(ctx, config)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer conn.Close(ctx)
+			bound := bobexec.WithExecutor(ctx, bobpgx.NewConn(conn), n.ExecutionConfig{})
+			u := models.UsersAs("u")
+			input := models.UsersInsert{ID: int64(mode), Tenant: 7, Name: "duplicate"}
+			if _, err := db.Exec(`INSERT INTO users(id,tenant,name) VALUES($1,$2,$3)`, input.ID, input.Tenant, input.Name); err != nil {
+				t.Fatal(err)
+			}
+			_, err = u.Insert(input).OneContext(bound)
+			databaseError, ok := errors.AsType[*pgconn.PgError](err)
+			if !ok {
+				t.Fatalf("lost database constraint error: %v", err)
+			}
+			require(t, databaseError.Code, "23505")
+		})
+	}
 }
