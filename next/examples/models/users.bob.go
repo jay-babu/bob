@@ -62,6 +62,15 @@ func (c UsersColumns) Projection() next.Projection[*UsersRow] {
 	}}
 }
 func (c UsersColumns) Query() next.RowQuery[*UsersRow] { return next.FullRows(c.Ref, c.Projection()) }
+func (c UsersColumns) Insert(v UsersInsert) next.RowMutation[*UsersRow] {
+	return next.FullWrite(next.Insert(c.Ref, v.Assignments(c)...), c.Projection())
+}
+func (c UsersColumns) Update(v UsersUpdate) next.RowMutation[*UsersRow] {
+	return next.FullWrite(next.Update(c.Ref, v.Assignments(c)...), c.Projection())
+}
+func (c UsersColumns) Delete() next.RowMutation[*UsersRow] {
+	return next.FullWrite(next.Delete(c.Ref), c.Projection())
+}
 
 type UsersInsert struct {
 	ID      int64

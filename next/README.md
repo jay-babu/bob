@@ -109,6 +109,22 @@ rows, err := u.Query().
 pagination. `OneContext`, `EachContext` and `CountContext` use the same binding.
 Normal table reads require neither a session nor an explicit projection.
 
+Writes keep their full-row result types attached as well:
+
+```go
+row, err := u.Insert(models.UsersInsert{
+    ID: userID, Tenant: tenantID, Name: "New user",
+}).OneContext(ctx)
+
+err = u.Update(models.UsersUpdate{Name: next.Set("Renamed")}).
+    Where(u.Tenant.EQ(tenantID), u.ID.EQ(userID)).
+    ExecOneContext(ctx)
+```
+
+`OneContext` and `AllContext` request full rows with `RETURNING`; `ExecContext`
+and `ExecOneContext` execute without returning columns. Read-only views expose
+neither insert, update nor delete methods.
+
 The database integration binds its executor once. With `database/sql`:
 
 ```go

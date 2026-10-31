@@ -314,6 +314,11 @@ func renderTable(t Table) ([]byte, error) {
 		fmt.Fprintf(&b, "&v.%s,", c.GoName)
 	}
 	b.WriteString(");return v,err}}}\nfunc (c Columns) Query() next.RowQuery[*Row] {return next.FullRows(c.Ref,c.Projection())}\n")
+	if !t.Info.ReadOnly {
+		b.WriteString("func(c Columns) Insert(v Insert) next.RowMutation[*Row] {return next.FullWrite(next.Insert(c.Ref,v.Assignments(c)...),c.Projection())}\n")
+		b.WriteString("func(c Columns) Update(v Update) next.RowMutation[*Row] {return next.FullWrite(next.Update(c.Ref,v.Assignments(c)...),c.Projection())}\n")
+		b.WriteString("func(c Columns) Delete() next.RowMutation[*Row] {return next.FullWrite(next.Delete(c.Ref),c.Projection())}\n")
+	}
 	for _, kind := range []string{"Insert", "Update"} {
 		if t.Info.ReadOnly {
 			break

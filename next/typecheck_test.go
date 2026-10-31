@@ -25,6 +25,7 @@ func TestInvalidTypedProgramsDoNotCompile(t *testing.T) {
 		"wrong cursor type":               `u:=models.UsersAs("u");_ = next.Cursor(u.ID,"wrong",false)`,
 		"readonly generated column":       `u:=models.UsersAs("u");_ = u.Fingerprint.Set(2)`,
 		"wrong full row result":           `u:=models.UsersAs("u");var rows []*models.PostsRow;rows,_=u.Query().AllContext(context.Background());_ = rows`,
+		"wrong table insert":              `u:=models.UsersAs("u");_ = u.Insert(models.PostsInsert{})`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()

@@ -37,7 +37,7 @@ func TestNativePGXContextUsesDBExecTransaction(t *testing.T) {
 		t.Fatal("ILIKE accepted for a dialect without the same matching semantics")
 	}
 	input := models.UsersInsert{ID: 1, Tenant: 7, Name: "Private name"}
-	if err := n.ExecOneContext(bound, n.Insert(u.Ref, input.Assignments(u)...)); err != nil {
+	if err := u.Insert(input).ExecOneContext(bound); err != nil {
 		t.Fatal(err)
 	}
 	row, err := u.Query().Where(u.Tenant.EQ(7), u.ID.EQ(1)).OneContext(bound)

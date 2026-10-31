@@ -76,6 +76,36 @@ func TestFullRowContextQueries(t *testing.T) {
 	require(t, rows[0].Name, "Bob")
 }
 
+func TestFullRowContextMutations(t *testing.T) {
+	db := database(t)
+	ctx := n.WithExecutor(context.Background(), db, n.ExecutionConfig{Dialect: n.SQLite})
+	u := models.UsersAs("u")
+	input := models.UsersInsert{ID: 3, Tenant: 7, Name: "Inserted"}
+	row, err := u.Insert(input).OneContext(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	require(t, row, &models.UsersRow{ID: 3, Tenant: 7, Name: "Inserted", Version: 1, Fingerprint: 6})
+	patch := models.UsersUpdate{Name: n.Set("Updated")}
+	row, err = u.Update(patch).Where(u.Tenant.EQ(7), u.ID.EQ(3)).OneContext(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	require(t, row.Name, "Updated")
+	if _, err := u.Update(patch).ExecContext(ctx); err == nil {
+		t.Fatal("unscoped update accepted")
+	}
+	if err := u.Update(patch).Where(u.Tenant.EQ(8), u.ID.EQ(3)).ExecOneContext(ctx); !errors.Is(err, n.ErrNotMatched) {
+		t.Fatal(err)
+	}
+	if err := u.Delete().Where(u.Tenant.EQ(7), u.ID.EQ(3)).ExecOneContext(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := u.Query().Where(u.Tenant.EQ(7), u.ID.EQ(3)).OneContext(ctx); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatal(err)
+	}
+}
+
 func TestContextExecutorScopeAndTransactionOwnership(t *testing.T) {
 	db := database(t)
 	parent := n.WithExecutor(context.Background(), db, n.ExecutionConfig{Dialect: n.SQLite})

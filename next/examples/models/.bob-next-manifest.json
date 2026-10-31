@@ -1,7 +1,7 @@
 {
   "go-bindings.json": "71e09fc5656fe56225823ba27f35a4e4d10e182c05ac9ac4cf423f9c2cba40c7",
-  "posts.bob.go": "a21c1a100cc8915ff97ebb210a8225d5f3f7e1c6c3e6d694c0362f4d2beb2582",
+  "posts.bob.go": "f63c9dbe7e66cfa971d364bc6c8a4db45d5d863b75ce7b6b5f9be16b6c039177",
   "relations/postsuser/relation.bob.go": "9f451fc479ff13921ae4d42992c99c436f4bb9ffcdc11d1d6c48f7097000e838",
   "schema.json": "34c345c6cf9371a2f00ebb8e1b46a3b5ff2b9cb239580832c81e267ddbd7f831",
-  "users.bob.go": "061b6908b1856638a64a407321e185b4761618ed8ad6ffbf122df0f9661c9f14"
+  "users.bob.go": "26a6d88e06cac2c80b19b2bc124d007b581d6333e88d0bf13ed7e3d1181d714a"
 }
