@@ -1,0 +1,56 @@
+{
+  "tables": 150,
+  "columns": 16,
+  "generation_seconds_both": 11.601057638879865,
+  "go": "go version go1.27.3 linux/amd64",
+  "results": {
+    "legacy": {
+      "generated_go_files": 750,
+      "generated_go_bytes": 7079248,
+      "clean": {
+        "seconds": 10.99,
+        "max_process_rss_kib": 282032,
+        "binary_bytes": 4297716
+      },
+      "warm": {
+        "seconds": 0.1,
+        "max_process_rss_kib": 26396,
+        "binary_bytes": 4297716
+      },
+      "application_edit": {
+        "seconds": 0.99,
+        "max_process_rss_kib": 123348,
+        "binary_bytes": 4297716
+      },
+      "unrelated_schema_edit": {
+        "seconds": 0.1,
+        "max_process_rss_kib": 25544,
+        "binary_bytes": 4297716
+      }
+    },
+    "compact": {
+      "generated_go_files": 150,
+      "generated_go_bytes": 915896,
+      "clean": {
+        "seconds": 7.88,
+        "max_process_rss_kib": 282972,
+        "binary_bytes": 3332036
+      },
+      "warm": {
+        "seconds": 0.08,
+        "max_process_rss_kib": 23568,
+        "binary_bytes": 3332036
+      },
+      "application_edit": {
+        "seconds": 0.48,
+        "max_process_rss_kib": 81076,
+        "binary_bytes": 3332036
+      },
+      "unrelated_schema_edit": {
+        "seconds": 0.08,
+        "max_process_rss_kib": 23668,
+        "binary_bytes": 3332036
+      }
+    }
+  }
+}

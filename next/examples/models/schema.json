@@ -1,0 +1,133 @@
+{
+  "version": 1,
+  "tables": [
+    {
+      "key": "posts",
+      "package": "posts",
+      "info": {
+        "name": "posts",
+        "columns": [
+          {
+            "name": "id"
+          },
+          {
+            "name": "tenant"
+          },
+          {
+            "name": "user_id"
+          },
+          {
+            "name": "title"
+          }
+        ],
+        "primary_key": [
+          "tenant",
+          "id"
+        ]
+      },
+      "columns": [
+        {
+          "name": "id",
+          "go_name": "ID",
+          "go_type": "int64"
+        },
+        {
+          "name": "tenant",
+          "go_name": "Tenant",
+          "go_type": "int64"
+        },
+        {
+          "name": "user_id",
+          "go_name": "UserID",
+          "go_type": "int64"
+        },
+        {
+          "name": "title",
+          "go_name": "Title",
+          "go_type": "string"
+        }
+      ]
+    },
+    {
+      "key": "users",
+      "package": "users",
+      "info": {
+        "name": "users",
+        "columns": [
+          {
+            "name": "id"
+          },
+          {
+            "name": "tenant"
+          },
+          {
+            "name": "name"
+          },
+          {
+            "name": "note",
+            "nullable": true
+          },
+          {
+            "name": "version",
+            "has_default": true
+          },
+          {
+            "name": "fingerprint",
+            "generated": true
+          }
+        ],
+        "primary_key": [
+          "tenant",
+          "id"
+        ]
+      },
+      "columns": [
+        {
+          "name": "id",
+          "go_name": "ID",
+          "go_type": "int64"
+        },
+        {
+          "name": "tenant",
+          "go_name": "Tenant",
+          "go_type": "int64"
+        },
+        {
+          "name": "name",
+          "go_name": "Name",
+          "go_type": "string"
+        },
+        {
+          "name": "note",
+          "go_name": "Note",
+          "go_type": "string"
+        },
+        {
+          "name": "version",
+          "go_name": "Version",
+          "go_type": "int64"
+        },
+        {
+          "name": "fingerprint",
+          "go_name": "Fingerprint",
+          "go_type": "int64"
+        }
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "name": "postsuser",
+      "from": "posts",
+      "to": "users",
+      "from_columns": [
+        "tenant",
+        "user_id"
+      ],
+      "to_columns": [
+        "tenant",
+        "id"
+      ]
+    }
+  ]
+}

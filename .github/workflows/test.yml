@@ -15,6 +15,13 @@ jobs:
       - name: Checkout Repo
         uses: actions/checkout@v4
 
+      - name: Free disk space for generated test builds
+        # Race and coverage builds of the generated fixtures need the space
+        # occupied by SDKs this Go-only job does not use.
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          df -h /
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:

@@ -4,6 +4,8 @@
 
 ## Links
 
+- [Experimental schema/runtime redesign](next/README.md)
+
 - [Documentation][docs]
 - [Reference][reference]
 
