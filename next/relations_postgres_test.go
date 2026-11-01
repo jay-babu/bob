@@ -21,7 +21,7 @@ type relatedPost struct {
 
 func TestBoundedRelationshipPlansPreserveTenantAndParentPages(t *testing.T) {
 	db := pgtest.Open(t)
-	if _, err := db.Exec(`CREATE TABLE people(tenant bigint,id bigint,name text,PRIMARY KEY(tenant,id));
+	if _, err := db.ExecContext(t.Context(), `CREATE TABLE people(tenant bigint,id bigint,name text,PRIMARY KEY(tenant,id));
 CREATE TABLE posts(tenant bigint,id bigint,user_id bigint,title text,PRIMARY KEY(tenant,id),FOREIGN KEY(tenant,user_id) REFERENCES people(tenant,id));
 INSERT INTO people VALUES(7,1,'first'),(7,2,'empty'),(8,1,'private');
 INSERT INTO posts VALUES(7,1,1,'one'),(7,2,1,'two'),(8,1,1,'private');`); err != nil {

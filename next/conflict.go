@@ -19,6 +19,7 @@ func (m Mutation) OnConflict(columns ...Selection) Mutation {
 	m.conflict = &conflict{columns: slices.Clone(columns)}
 	return m
 }
+
 func (m Mutation) DoUpdate(sets ...Assignment) Mutation {
 	c := conflict{}
 	if m.conflict != nil {
@@ -29,6 +30,7 @@ func (m Mutation) DoUpdate(sets ...Assignment) Mutation {
 	m.conflict = &c
 	return m
 }
+
 func (m Mutation) ConflictWhere(ps ...Predicate) Mutation {
 	c := conflict{}
 	if m.conflict != nil {
@@ -40,7 +42,7 @@ func (m Mutation) ConflictWhere(ps ...Predicate) Mutation {
 }
 
 // Excluded is the proposed insert value and is valid only in conflict updates.
-func Excluded[T any](column Column[T]) Expr[T] { return Expr[T]{excludedNode{column.ref, column.name}} }
+func Excluded[T any](column Column[T]) Expr[T] { return Expr[T]{excludedNode(column)} }
 
 type excludedNode struct {
 	ref  Ref

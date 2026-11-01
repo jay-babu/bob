@@ -61,6 +61,7 @@ func flatSource(code []byte, pkg, prefix string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	//nolint:staticcheck // Resolve only declarations emitted by this generator; keyed fields are excluded below.
 	objects := map[*ast.Object]string{}
 	capture := func(id *ast.Ident) {
 		if id.Obj == nil {

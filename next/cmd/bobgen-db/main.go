@@ -57,7 +57,7 @@ func run(ctx context.Context, dsn, schemas, out, importPath, typeMap, relations 
 	if err != nil {
 		return fmt.Errorf("cannot start schema inspection transaction")
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	schema, err := postgres.Inspect(ctx, tx, postgres.Options{Schemas: split(schemas), ImportPath: importPath, Types: overrides})
 	if err != nil {
 		return err
@@ -83,6 +83,7 @@ func run(ctx context.Context, dsn, schemas, out, importPath, typeMap, relations 
 	fmt.Printf("generated: %d written, %d unchanged, %d removed; %d bytes\n", report.Written, report.Unchanged, report.Removed, report.Bytes)
 	return nil
 }
+
 func split(value string) []string {
 	var values []string
 	for _, item := range strings.Split(value, ",") {

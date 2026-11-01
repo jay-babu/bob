@@ -18,8 +18,10 @@ type ExecutionConfig struct {
 	InTransaction bool
 }
 
-type executionKey struct{}
-type executionValue struct{ session Session }
+type (
+	executionKey   struct{}
+	executionValue struct{ session Session }
+)
 
 // WithExecutor binds a database/sql executor without taking ownership of it.
 // The resulting context must not outlive an attached transaction. A nil executor
@@ -86,6 +88,7 @@ func AllContext[T any](ctx context.Context, q Buildable, p Projection[T]) ([]T, 
 	}
 	return All(ctx, s, q, p)
 }
+
 func OneContext[T any](ctx context.Context, q Buildable, p Projection[T]) (T, error) {
 	s, err := sessionFromContext(ctx)
 	if err != nil {

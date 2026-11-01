@@ -11,7 +11,7 @@ type CursorKey struct {
 }
 
 func Cursor[T any](column Column[T], value T, descending bool) CursorKey {
-	return CursorKey{columnNode{column.ref, column.name}, valueNode{value}, descending}
+	return CursorKey{columnNode(column), valueNode{value}, descending}
 }
 
 // SeekAfter creates lexicographic predicates and matching ordering. Keys must

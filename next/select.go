@@ -38,18 +38,22 @@ type SelectQuery struct {
 func Select(from Ref, columns ...Selection) SelectQuery {
 	return SelectQuery{from: from, columns: slices.Clone(columns)}
 }
+
 func (q SelectQuery) Where(ps ...Predicate) SelectQuery {
 	q.where = append(slices.Clone(q.where), ps...)
 	return q
 }
+
 func (q SelectQuery) Having(ps ...Predicate) SelectQuery {
 	q.having = append(slices.Clone(q.having), ps...)
 	return q
 }
+
 func (q SelectQuery) OrderBy(os ...Order) SelectQuery {
 	q.order = append(slices.Clone(q.order), os...)
 	return q
 }
+
 func (q SelectQuery) GroupBy(cs ...Selection) SelectQuery {
 	q.group = slices.Clone(q.group)
 	for _, c := range cs {
@@ -125,33 +129,7 @@ func (q SelectQuery) write(r *renderer) {
 	outer := r.scope
 	r.scope = maps.Clone(outer)
 	defer func() { r.scope = outer }()
-	add := func(ref Ref) {
-		if ref.b == nil || ref.b.table == nil || ref.b.alias == "" {
-			r.fail(fmt.Errorf("table reference requires a table and alias"))
-			return
-		}
-		if _, exists := r.scope[ref.b]; exists {
-			r.fail(fmt.Errorf("the same table binding cannot represent two table occurrences"))
-			return
-		}
-		bounded := identifierAlias(ref.b.alias, r.dialect)
-		used := func(name string) bool {
-			for _, alias := range r.scope {
-				if alias == name {
-					return true
-				}
-			}
-			return false
-		}
-		for suffix := 2; used(bounded); suffix++ {
-			bounded = identifierAlias(fmt.Sprintf("%s_%d", ref.b.alias, suffix), r.dialect)
-		}
-		r.scope[ref.b] = bounded
-	}
-	add(q.from)
-	for _, j := range q.joins {
-		add(j.ref)
-	}
+	q.bind(r)
 	r.WriteString("SELECT ")
 	if q.distinct {
 		r.WriteString("DISTINCT ")
@@ -229,4 +207,34 @@ func writeWhere(r *renderer, prefix string, ps []Predicate) {
 	}
 	r.WriteString(prefix)
 	r.expr(And(ps...).node)
+}
+
+func (q SelectQuery) bind(r *renderer) {
+	add := func(ref Ref) {
+		if ref.b == nil || ref.b.table == nil || ref.b.alias == "" {
+			r.fail(fmt.Errorf("table reference requires a table and alias"))
+			return
+		}
+		if _, exists := r.scope[ref.b]; exists {
+			r.fail(fmt.Errorf("the same table binding cannot represent two table occurrences"))
+			return
+		}
+		bounded := identifierAlias(ref.b.alias, r.dialect)
+		used := func(name string) bool {
+			for _, alias := range r.scope {
+				if alias == name {
+					return true
+				}
+			}
+			return false
+		}
+		for suffix := 2; used(bounded); suffix++ {
+			bounded = identifierAlias(fmt.Sprintf("%s_%d", ref.b.alias, suffix), r.dialect)
+		}
+		r.scope[ref.b] = bounded
+	}
+	add(q.from)
+	for _, j := range q.joins {
+		add(j.ref)
+	}
 }

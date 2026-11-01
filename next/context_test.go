@@ -132,11 +132,11 @@ func TestContextExecutorScopeAndTransactionOwnership(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	tx, err := db.Begin()
+	tx, err := db.BeginTx(t.Context(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	var events []n.Event
 	child := n.WithExecutor(parent, tx, n.ExecutionConfig{Dialect: n.SQLite, Observer: func(_ context.Context, event n.Event) { events = append(events, event) }})
 	if err := n.ExecOneContext(child, n.Update(u.Ref, u.Name.Set("Uncommitted")).Where(u.Tenant.EQ(7), u.ID.EQ(1))); err != nil {
@@ -172,7 +172,7 @@ func TestBobExecutorBridgeKeepsSameTransaction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer tx.Rollback(parent)
+	defer func() { _ = tx.Rollback(parent) }()
 	ctx := bobexec.WithExecutor(parent, tx, n.ExecutionConfig{Dialect: n.SQLite, InTransaction: true})
 	exec, err := bob.ExecutorFromContext(ctx)
 	if err != nil || exec != tx {

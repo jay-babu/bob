@@ -42,6 +42,7 @@ func (q RowQuery[T]) Where(ps ...Predicate) RowQuery[T] {
 	q.query = q.query.Where(ps...)
 	return q
 }
+
 func (q RowQuery[T]) OrderBy(os ...Order) RowQuery[T] {
 	q.query = q.query.OrderBy(os...)
 	return q
@@ -53,10 +54,12 @@ func (q RowQuery[T]) SeekAfter(keys ...CursorKey) RowQuery[T] {
 	q.query = q.query.SeekAfter(keys...)
 	return q
 }
+
 func (q RowQuery[T]) JoinRelation(rel Relation, from, to Ref, left bool) RowQuery[T] {
 	q.query = q.query.JoinRelation(rel, from, to, left)
 	return q
 }
+
 func (q RowQuery[T]) JoinOn(to Ref, on Predicate, left bool) RowQuery[T] {
 	q.query = q.query.JoinOn(to, on, left)
 	return q
@@ -76,6 +79,7 @@ func (q RowQuery[T]) AllContext(ctx context.Context) ([]T, error) {
 	}
 	return rows, nil
 }
+
 func (q RowQuery[T]) OneContext(ctx context.Context) (T, error) {
 	s, err := sessionFromContext(ctx)
 	if err != nil {
@@ -90,6 +94,7 @@ func (q RowQuery[T]) OneContext(ctx context.Context) (T, error) {
 	}
 	return row, nil
 }
+
 func (q RowQuery[T]) EachContext(ctx context.Context, yield func(T) error) error {
 	if q.relations != nil {
 		return fmt.Errorf("streaming relationship loads require an explicit batched loader")
@@ -113,6 +118,7 @@ func (q RowQuery[T]) load(ctx context.Context, s Session, rows []T) error {
 	total := 0
 	return s.loadRelations(ctx, plan.Owner, parents, plan.Steps, plan.BatchSize, plan.MaxRows, &total)
 }
+
 func (q RowQuery[T]) CountContext(ctx context.Context) (int64, error) {
 	s, err := sessionFromContext(ctx)
 	if err != nil {

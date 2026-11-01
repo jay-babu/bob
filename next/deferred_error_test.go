@@ -31,12 +31,15 @@ type deferredErrorExecutor struct{ rows *deferredErrorRows }
 func (e deferredErrorExecutor) QueryRowsContext(context.Context, string, ...any) (n.Rows, error) {
 	return e.rows, nil
 }
+
 func (e deferredErrorExecutor) ExecContext(context.Context, string, ...any) (sql.Result, error) {
 	return nil, errors.New("unexpected exec")
 }
 
-var _ n.Rows = (*deferredErrorRows)(nil)
-var _ n.RowsExecutor = deferredErrorExecutor{}
+var (
+	_ n.Rows         = (*deferredErrorRows)(nil)
+	_ n.RowsExecutor = deferredErrorExecutor{}
+)
 
 func TestReturningErrorAfterCursorClosePreservesSQLState(t *testing.T) {
 	original := &pgconn.PgError{Code: "23503", ConstraintName: "expected_fk"}

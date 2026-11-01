@@ -23,6 +23,7 @@ func main() {
 		os.Exit(1)
 	}
 }
+
 func run(source, directory, importPath, relations string, layouts ...string) error {
 	f, err := os.Open(source)
 	if err != nil {

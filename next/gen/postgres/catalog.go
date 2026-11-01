@@ -97,155 +97,7 @@ func Inspect(ctx context.Context, db Querier, options Options) (gen.Schema, erro
 	if err := rows.Close(); err != nil {
 		return s, err
 	}
-	encoded, err := json.Marshal(options.Schemas)
-	if err != nil {
-		return s, err
-	}
-	rows, err = db.QueryContext(ctx, `SELECT c.oid,n.nspname,c.relname,c.relkind::text,a.attname,a.atttypid,pg_catalog.format_type(a.atttypid,a.atttypmod),NOT a.attnotnull,COALESCE(pg_catalog.pg_get_expr(d.adbin,d.adrelid),''),a.attgenerated::text,a.attidentity::text
-FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
-JOIN pg_catalog.pg_attribute a ON a.attrelid=c.oid AND a.attnum>0 AND NOT a.attisdropped
-LEFT JOIN pg_catalog.pg_attrdef d ON d.adrelid=c.oid AND d.adnum=a.attnum
-WHERE c.relkind IN ('r','p','v','m','f') AND n.nspname IN (SELECT jsonb_array_elements_text($1::jsonb))
-AND (NOT c.relispartition OR $2)
-AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_depend dep WHERE dep.classid='pg_catalog.pg_class'::regclass AND dep.objid=c.oid AND dep.deptype='e')
-ORDER BY n.nspname,c.relname,a.attnum`, string(encoded), options.IncludePartitions)
-	if err != nil {
-		return s, err
-	}
-	indices := map[uint32]int{}
-	for rows.Next() {
-		var oid, typeOID uint32
-		var schema, name, kind, column, dbType, defaultExpr, generated, identity string
-		var nullable bool
-		if err := rows.Scan(&oid, &schema, &name, &kind, &column, &typeOID, &dbType, &nullable, &defaultExpr, &generated, &identity); err != nil {
-			rows.Close()
-			return s, err
-		}
-		index, exists := indices[oid]
-		if !exists {
-			index = len(s.Tables)
-			indices[oid] = index
-			s.Tables = append(s.Tables, gen.Table{Key: schema + "." + name, Package: packageName(schema + "_" + name), Info: next.TableInfo{Schema: schema, Name: name, ReadOnly: kind == "v" || kind == "m" || kind == "f"}})
-		}
-		mapping, err := c.resolve(typeOID)
-		if err != nil {
-			rows.Close()
-			return s, fmt.Errorf("column %s.%s.%s: %w", schema, name, column, err)
-		}
-		table := &s.Tables[index]
-		domainNotNull, domainDefault := false, false
-		for typ := c.types[typeOID]; typ.Kind == "d"; typ = c.types[typ.Base] {
-			domainNotNull = domainNotNull || typ.NotNull
-			domainDefault = domainDefault || typ.Default != ""
-		}
-		effectiveNullable := nullable && !domainNotNull
-		if table.Info.ReadOnly {
-			effectiveNullable = nullable
-		}
-		table.Info.Columns = append(table.Info.Columns, next.ColumnInfo{Name: column, DBType: dbType, Nullable: effectiveNullable, HasDefault: defaultExpr != "" || identity != "" || domainDefault, Generated: generated != "" || identity == "a"})
-		goName := gen.Identifier(column)
-		switch goName {
-		case "Ref", "Projection", "Assignments", "Query", "Insert", "Update", "Delete":
-			goName += "Value"
-		}
-		if goName == "" || slices.ContainsFunc(table.Columns, func(c gen.Column) bool { return c.GoName == goName }) {
-			hash := sha256.Sum256([]byte(column))
-			goName = "Field" + goName + fmt.Sprintf("%x", hash[:4])
-		}
-		table.Columns = append(table.Columns, gen.Column{Name: column, GoName: goName, GoType: mapping.GoType})
-		table.Imports = append(table.Imports, mapping.Imports...)
-	}
-	if err := rows.Err(); err != nil {
-		rows.Close()
-		return s, err
-	}
-	if err := rows.Close(); err != nil {
-		return s, err
-	}
-	// JSON preserves ordered key columns without coupling catalog reads to a driver's array decoder.
-	rows, err = db.QueryContext(ctx, `SELECT con.conrelid,con.contype::text,con.conname,con.confrelid,
-COALESCE((SELECT jsonb_agg(a.attname ORDER BY k.ord) FROM unnest(con.conkey) WITH ORDINALITY k(attnum,ord) JOIN pg_catalog.pg_attribute a ON a.attrelid=con.conrelid AND a.attnum=k.attnum),'[]'::jsonb)::text,
-COALESCE((SELECT jsonb_agg(a.attname ORDER BY k.ord) FROM unnest(con.confkey) WITH ORDINALITY k(attnum,ord) JOIN pg_catalog.pg_attribute a ON a.attrelid=con.confrelid AND a.attnum=k.attnum),'[]'::jsonb)::text
-FROM pg_catalog.pg_constraint con JOIN pg_catalog.pg_class cl ON cl.oid=con.conrelid JOIN pg_catalog.pg_namespace n ON n.oid=cl.relnamespace
-WHERE con.contype IN ('p','u','f') AND n.nspname IN (SELECT jsonb_array_elements_text($1::jsonb)) ORDER BY con.conrelid,con.conname`, string(encoded))
-	if err != nil {
-		return s, err
-	}
-	for rows.Next() {
-		var oid, target uint32
-		var kind, name, localJSON, foreignJSON string
-		if err := rows.Scan(&oid, &kind, &name, &target, &localJSON, &foreignJSON); err != nil {
-			rows.Close()
-			return s, err
-		}
-		index, ok := indices[oid]
-		if !ok {
-			continue
-		}
-		var local, foreign []string
-		if err := json.Unmarshal([]byte(localJSON), &local); err != nil {
-			rows.Close()
-			return s, err
-		}
-		if err := json.Unmarshal([]byte(foreignJSON), &foreign); err != nil {
-			rows.Close()
-			return s, err
-		}
-		table := &s.Tables[index]
-		switch kind {
-		case "p":
-			table.Info.PrimaryKey = local
-		case "u":
-			table.Info.UniqueKeys = append(table.Info.UniqueKeys, local)
-		case "f":
-			if ti, ok := indices[target]; ok {
-				s.Relations = append(s.Relations, gen.Relation{Name: packageName(table.Key + "_" + name), Constraint: name, From: table.Key, To: s.Tables[ti].Key, FromColumns: local, ToColumns: foreign})
-			}
-		}
-	}
-	if err := rows.Err(); err != nil {
-		rows.Close()
-		return s, err
-	}
-	if err := rows.Close(); err != nil {
-		return s, err
-	}
-	rows, err = db.QueryContext(ctx, `SELECT ix.indrelid,jsonb_agg(a.attname ORDER BY k.ord)::text FROM pg_catalog.pg_index ix
-JOIN pg_catalog.pg_class cl ON cl.oid=ix.indrelid JOIN pg_catalog.pg_namespace n ON n.oid=cl.relnamespace
-CROSS JOIN LATERAL unnest(ix.indkey::smallint[]) WITH ORDINALITY k(attnum,ord)
-JOIN pg_catalog.pg_attribute a ON a.attrelid=ix.indrelid AND a.attnum=k.attnum
-WHERE ix.indisunique AND ix.indisvalid AND ix.indisready AND ix.indpred IS NULL AND ix.indexprs IS NULL AND k.ord<=ix.indnkeyatts
-AND n.nspname IN (SELECT jsonb_array_elements_text($1::jsonb)) GROUP BY ix.indrelid,ix.indexrelid ORDER BY ix.indrelid,ix.indexrelid`, string(encoded))
-	if err != nil {
-		return s, err
-	}
-	for rows.Next() {
-		var oid uint32
-		var encoded string
-		if err := rows.Scan(&oid, &encoded); err != nil {
-			rows.Close()
-			return s, err
-		}
-		index, ok := indices[oid]
-		if !ok {
-			continue
-		}
-		var columns []string
-		if err := json.Unmarshal([]byte(encoded), &columns); err != nil {
-			rows.Close()
-			return s, err
-		}
-		info := &s.Tables[index].Info
-		if slices.Equal(info.PrimaryKey, columns) || slices.ContainsFunc(info.UniqueKeys, func(key []string) bool { return slices.Equal(key, columns) }) {
-			continue
-		}
-		info.UniqueKeys = append(info.UniqueKeys, columns)
-	}
-	if err := rows.Err(); err != nil {
-		rows.Close()
-		return s, err
-	}
-	if err := rows.Close(); err != nil {
+	if err := c.inspectTables(ctx, db, &s); err != nil {
 		return s, err
 	}
 	for _, typ := range c.generated {
@@ -282,17 +134,11 @@ func (c *catalog) resolve(oid uint32) (Mapping, error) {
 	defer delete(c.visiting, oid)
 	var result Mapping
 	if typ.Kind == "e" || typ.Kind == "d" {
-		pkg := packageName(typ.Schema + "_" + typ.Name)
-		definition := gen.Type{Package: pkg, Kind: "enum", Values: typ.Values}
-		if typ.Kind == "d" {
-			base, err := c.resolve(typ.Base)
-			if err != nil {
-				return result, err
-			}
-			definition = gen.Type{Package: pkg, Kind: "domain", Base: base.GoType, Imports: base.Imports}
+		named, err := c.resolveNamed(typ)
+		if err != nil {
+			return result, err
 		}
-		c.generated[pkg] = definition
-		result = Mapping{GoType: pkg + ".Value", Imports: []string{pkg + " " + strconv.Quote(c.options.ImportPath+"/types/"+pkg)}}
+		result = named
 	} else if typ.Element != 0 && c.types[typ.Element].Delimiter == "," {
 		element, err := c.resolve(typ.Element)
 		if err != nil {
@@ -359,4 +205,177 @@ func packageName(key string) string {
 		name += fmt.Sprintf("_%x", sum[:4])
 	}
 	return name
+}
+
+func (c *catalog) inspectTables(ctx context.Context, db Querier, s *gen.Schema) error {
+	encoded, err := json.Marshal(c.options.Schemas)
+	if err != nil {
+		return err
+	}
+	rows, err := db.QueryContext(ctx, `SELECT c.oid,n.nspname,c.relname,c.relkind::text,a.attname,a.atttypid,pg_catalog.format_type(a.atttypid,a.atttypmod),NOT a.attnotnull,COALESCE(pg_catalog.pg_get_expr(d.adbin,d.adrelid),''),a.attgenerated::text,a.attidentity::text
+FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+JOIN pg_catalog.pg_attribute a ON a.attrelid=c.oid AND a.attnum>0 AND NOT a.attisdropped
+LEFT JOIN pg_catalog.pg_attrdef d ON d.adrelid=c.oid AND d.adnum=a.attnum
+WHERE c.relkind IN ('r','p','v','m','f') AND n.nspname IN (SELECT jsonb_array_elements_text($1::jsonb))
+AND (NOT c.relispartition OR $2)
+AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_depend dep WHERE dep.classid='pg_catalog.pg_class'::regclass AND dep.objid=c.oid AND dep.deptype='e')
+ORDER BY n.nspname,c.relname,a.attnum`, string(encoded), c.options.IncludePartitions)
+	if err != nil {
+		return err
+	}
+	indices := map[uint32]int{}
+	for rows.Next() {
+		var oid, typeOID uint32
+		var schema, name, kind, column, dbType, defaultExpr, generated, identity string
+		var nullable bool
+		if err := rows.Scan(&oid, &schema, &name, &kind, &column, &typeOID, &dbType, &nullable, &defaultExpr, &generated, &identity); err != nil {
+			rows.Close()
+			return err
+		}
+		index, exists := indices[oid]
+		if !exists {
+			index = len(s.Tables)
+			indices[oid] = index
+			s.Tables = append(s.Tables, gen.Table{Key: schema + "." + name, Package: packageName(schema + "_" + name), Info: next.TableInfo{Schema: schema, Name: name, ReadOnly: kind == "v" || kind == "m" || kind == "f"}})
+		}
+		mapping, err := c.resolve(typeOID)
+		if err != nil {
+			rows.Close()
+			return fmt.Errorf("column %s.%s.%s: %w", schema, name, column, err)
+		}
+		table := &s.Tables[index]
+		domainNotNull, domainDefault := false, false
+		for typ := c.types[typeOID]; typ.Kind == "d"; typ = c.types[typ.Base] {
+			domainNotNull = domainNotNull || typ.NotNull
+			domainDefault = domainDefault || typ.Default != ""
+		}
+		effectiveNullable := nullable && !domainNotNull
+		if table.Info.ReadOnly {
+			effectiveNullable = nullable
+		}
+		table.Info.Columns = append(table.Info.Columns, next.ColumnInfo{Name: column, DBType: dbType, Nullable: effectiveNullable, HasDefault: defaultExpr != "" || identity != "" || domainDefault, Generated: generated != "" || identity == "a"})
+		goName := gen.Identifier(column)
+		switch goName {
+		case "Ref", "Projection", "Assignments", "Query", "Insert", "Update", "Delete":
+			goName += "Value"
+		}
+		if goName == "" || slices.ContainsFunc(table.Columns, func(c gen.Column) bool { return c.GoName == goName }) {
+			hash := sha256.Sum256([]byte(column))
+			goName = "Field" + goName + fmt.Sprintf("%x", hash[:4])
+		}
+		table.Columns = append(table.Columns, gen.Column{Name: column, GoName: goName, GoType: mapping.GoType})
+		table.Imports = append(table.Imports, mapping.Imports...)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	return inspectKeys(ctx, db, encoded, indices, s)
+}
+
+func inspectKeys(ctx context.Context, db Querier, encoded []byte, indices map[uint32]int, s *gen.Schema) error {
+	// JSON preserves ordered key columns without coupling catalog reads to a driver's array decoder.
+	rows, err := db.QueryContext(ctx, `SELECT con.conrelid,con.contype::text,con.conname,con.confrelid,
+COALESCE((SELECT jsonb_agg(a.attname ORDER BY k.ord) FROM unnest(con.conkey) WITH ORDINALITY k(attnum,ord) JOIN pg_catalog.pg_attribute a ON a.attrelid=con.conrelid AND a.attnum=k.attnum),'[]'::jsonb)::text,
+COALESCE((SELECT jsonb_agg(a.attname ORDER BY k.ord) FROM unnest(con.confkey) WITH ORDINALITY k(attnum,ord) JOIN pg_catalog.pg_attribute a ON a.attrelid=con.confrelid AND a.attnum=k.attnum),'[]'::jsonb)::text
+FROM pg_catalog.pg_constraint con JOIN pg_catalog.pg_class cl ON cl.oid=con.conrelid JOIN pg_catalog.pg_namespace n ON n.oid=cl.relnamespace
+WHERE con.contype IN ('p','u','f') AND n.nspname IN (SELECT jsonb_array_elements_text($1::jsonb)) ORDER BY con.conrelid,con.conname`, string(encoded))
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var oid, target uint32
+		var kind, name, localJSON, foreignJSON string
+		if err := rows.Scan(&oid, &kind, &name, &target, &localJSON, &foreignJSON); err != nil {
+			rows.Close()
+			return err
+		}
+		index, ok := indices[oid]
+		if !ok {
+			continue
+		}
+		var local, foreign []string
+		if err := json.Unmarshal([]byte(localJSON), &local); err != nil {
+			rows.Close()
+			return err
+		}
+		if err := json.Unmarshal([]byte(foreignJSON), &foreign); err != nil {
+			rows.Close()
+			return err
+		}
+		table := &s.Tables[index]
+		switch kind {
+		case "p":
+			table.Info.PrimaryKey = local
+		case "u":
+			table.Info.UniqueKeys = append(table.Info.UniqueKeys, local)
+		case "f":
+			if ti, ok := indices[target]; ok {
+				s.Relations = append(s.Relations, gen.Relation{Name: packageName(table.Key + "_" + name), Constraint: name, From: table.Key, To: s.Tables[ti].Key, FromColumns: local, ToColumns: foreign})
+			}
+		}
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	rows, err = db.QueryContext(ctx, `SELECT ix.indrelid,jsonb_agg(a.attname ORDER BY k.ord)::text FROM pg_catalog.pg_index ix
+JOIN pg_catalog.pg_class cl ON cl.oid=ix.indrelid JOIN pg_catalog.pg_namespace n ON n.oid=cl.relnamespace
+CROSS JOIN LATERAL unnest(ix.indkey::smallint[]) WITH ORDINALITY k(attnum,ord)
+JOIN pg_catalog.pg_attribute a ON a.attrelid=ix.indrelid AND a.attnum=k.attnum
+WHERE ix.indisunique AND ix.indisvalid AND ix.indisready AND ix.indpred IS NULL AND ix.indexprs IS NULL AND k.ord<=ix.indnkeyatts
+AND n.nspname IN (SELECT jsonb_array_elements_text($1::jsonb)) GROUP BY ix.indrelid,ix.indexrelid ORDER BY ix.indrelid,ix.indexrelid`, string(encoded))
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var oid uint32
+		var encoded string
+		if err := rows.Scan(&oid, &encoded); err != nil {
+			rows.Close()
+			return err
+		}
+		index, ok := indices[oid]
+		if !ok {
+			continue
+		}
+		var columns []string
+		if err := json.Unmarshal([]byte(encoded), &columns); err != nil {
+			rows.Close()
+			return err
+		}
+		info := &s.Tables[index].Info
+		if slices.Equal(info.PrimaryKey, columns) || slices.ContainsFunc(info.UniqueKeys, func(key []string) bool { return slices.Equal(key, columns) }) {
+			continue
+		}
+		info.UniqueKeys = append(info.UniqueKeys, columns)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *catalog) resolveNamed(typ pgType) (Mapping, error) {
+	pkg := packageName(typ.Schema + "_" + typ.Name)
+	definition := gen.Type{Package: pkg, Kind: "enum", Values: typ.Values}
+	if typ.Kind == "d" {
+		base, err := c.resolve(typ.Base)
+		if err != nil {
+			return Mapping{}, err
+		}
+		definition = gen.Type{Package: pkg, Kind: "domain", Base: base.GoType, Imports: base.Imports}
+	}
+	c.generated[pkg] = definition
+	return Mapping{GoType: pkg + ".Value", Imports: []string{pkg + " " + strconv.Quote(c.options.ImportPath+"/types/"+pkg)}}, nil
 }

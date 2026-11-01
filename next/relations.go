@@ -9,11 +9,13 @@ import (
 
 // Relations stores requested relationship results without references to model
 // types in a row's field layout. Accessing it never performs database work.
-type Relations struct{ values map[string]relatedValue }
-type relatedValue struct {
-	value any
-	many  bool
-}
+type (
+	Relations    struct{ values map[string]relatedValue }
+	relatedValue struct {
+		value any
+		many  bool
+	}
+)
 
 func (r *Relations) IsLoaded(name string) bool {
 	if r == nil {

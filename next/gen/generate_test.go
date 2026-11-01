@@ -88,6 +88,7 @@ func TestApplicationValueTypesAndModelNames(t *testing.T) {
 		t.Fatal("invalid nullable Go type accepted")
 	}
 }
+
 func TestIncrementalGenerationOwnershipAndCleanup(t *testing.T) {
 	dir := t.TempDir()
 	config := gen.Config{Layout: gen.Tables, Directory: dir, ImportPath: "example.org/models"}

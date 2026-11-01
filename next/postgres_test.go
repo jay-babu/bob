@@ -18,7 +18,7 @@ import (
 func TestPostgreSQLExecution(t *testing.T) {
 	db := pgtest.Open(t)
 	ctx := context.Background()
-	_, err := db.Exec(`CREATE TABLE records(tenant bigint NOT NULL,id bigint NOT NULL,amount numeric(40,10) NOT NULL,payload jsonb NOT NULL,labels text[] NOT NULL,moments timestamptz[] NOT NULL,binary_values bytea[] NOT NULL,note text,version bigint NOT NULL DEFAULT 1,fingerprint bigint GENERATED ALWAYS AS (id*2) STORED,PRIMARY KEY(tenant,id))`)
+	_, err := db.ExecContext(t.Context(), `CREATE TABLE records(tenant bigint NOT NULL,id bigint NOT NULL,amount numeric(40,10) NOT NULL,payload jsonb NOT NULL,labels text[] NOT NULL,moments timestamptz[] NOT NULL,binary_values bytea[] NOT NULL,note text,version bigint NOT NULL DEFAULT 1,fingerprint bigint GENERATED ALWAYS AS (id*2) STORED,PRIMARY KEY(tenant,id))`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +110,7 @@ func TestPostgreSQLExecution(t *testing.T) {
 		if _, err := n.One(ctx, s, insert, p); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := db.Exec(`INSERT INTO records(tenant,id,amount,payload,labels,moments,binary_values) SELECT 7,2,amount,payload,labels,moments,binary_values FROM records WHERE tenant=7 AND id=1;
+		if _, err := db.ExecContext(t.Context(), `INSERT INTO records(tenant,id,amount,payload,labels,moments,binary_values) SELECT 7,2,amount,payload,labels,moments,binary_values FROM records WHERE tenant=7 AND id=1;
 INSERT INTO records(tenant,id,amount,payload,labels,moments,binary_values) SELECT 8,1,amount,payload,labels,moments,binary_values FROM records WHERE tenant=7 AND id=1;
 CREATE TABLE children(tenant bigint NOT NULL,parent_id bigint NOT NULL,id bigint NOT NULL,PRIMARY KEY(tenant,id),FOREIGN KEY(tenant,parent_id) REFERENCES records(tenant,id));
 INSERT INTO children VALUES(7,1,1),(7,1,2),(7,2,3),(8,1,1)`); err != nil {
@@ -171,7 +171,9 @@ INSERT INTO children VALUES(7,1,1),(7,1,2),(7,2,3),(8,1,1)`); err != nil {
 	t.Run("panic rolls back and reports failure", func(t *testing.T) {
 		func() {
 			defer func() {
-				if reason := recover(); reason != sentinel {
+				reason := recover()
+				panicErr, ok := reason.(error)
+				if !ok || !errors.Is(panicErr, sentinel) {
 					t.Fatalf("panic changed or disappeared: %v", reason)
 				}
 			}()

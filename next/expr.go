@@ -16,13 +16,16 @@ const (
 	MySQL
 )
 
-type node interface{ write(*renderer) }
-type Expr[T any] struct{ node node }
-type Predicate struct{ node node }
-type Selection struct {
-	node  node
-	label string
-}
+type (
+	node        interface{ write(*renderer) }
+	Expr[T any] struct{ node node }
+	Predicate   struct{ node node }
+	Selection   struct {
+		node  node
+		label string
+	}
+)
+
 type Order struct {
 	node node
 	desc bool
@@ -59,6 +62,7 @@ func (e Expr[T]) LT(value T) Predicate          { return compare(e.node, "<", Va
 func (e Expr[T]) LE(value T) Predicate          { return compare(e.node, "<=", Value(value).node) }
 func (e Expr[T]) IsNull() Predicate             { return Predicate{unaryNode{e.node, "IS NULL"}} }
 func (e Expr[T]) IsNotNull() Predicate          { return Predicate{unaryNode{e.node, "IS NOT NULL"}} }
+
 func (e Expr[T]) In(values ...T) Predicate {
 	nodes := make([]node, len(values))
 	for i, value := range values {
@@ -107,6 +111,7 @@ func (r *renderer) fail(err error) {
 		r.err = err
 	}
 }
+
 func (r *renderer) ident(s string) {
 	quote := `"`
 	if r.dialect == MySQL {
@@ -116,6 +121,7 @@ func (r *renderer) ident(s string) {
 	r.WriteString(strings.ReplaceAll(s, quote, quote+quote))
 	r.WriteString(quote)
 }
+
 func (r *renderer) arg(v any) {
 	r.args = append(r.args, v)
 	if r.dialect == Postgres {
@@ -125,6 +131,7 @@ func (r *renderer) arg(v any) {
 		r.WriteByte('?')
 	}
 }
+
 func (r *renderer) expr(n node) {
 	if n == nil {
 		r.fail(fmt.Errorf("empty expression"))
@@ -132,6 +139,7 @@ func (r *renderer) expr(n node) {
 	}
 	n.write(r)
 }
+
 func (r *renderer) ref(ref Ref) {
 	if ref.b == nil || ref.b.table == nil {
 		r.fail(fmt.Errorf("empty table reference"))
@@ -161,9 +169,10 @@ func (r *renderer) ref(ref Ref) {
 // any collision. Boundaries are bytes and never split a UTF-8 code point.
 func identifierAlias(name string, d Dialect) string {
 	limit := 0
-	if d == Postgres {
+	switch d {
+	case Postgres:
 		limit = 63
-	} else if d == MySQL {
+	case MySQL:
 		limit = 64
 	}
 	if limit == 0 || len(name) <= limit {

@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -44,7 +43,7 @@ func invalid(){` + body + "}\n"
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
-			cmd := exec.CommandContext(ctx, filepath.Join(runtime.GOROOT(), "bin", "go"), "test", "-mod=mod", ".")
+			cmd := exec.CommandContext(ctx, "go", "test", "-mod=mod", ".")
 			cmd.Dir = dir
 			cmd.Env = append(os.Environ(), "GOWORK=off", "GOTOOLCHAIN=local")
 			output, err := cmd.CombinedOutput()

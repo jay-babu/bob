@@ -18,12 +18,14 @@ func fixture() (*n.Table, *n.Table, n.Relation) {
 	p := n.DefineTable(n.TableInfo{Name: "posts", Columns: []n.ColumnInfo{{Name: "id"}, {Name: "tenant"}, {Name: "user_id"}, {Name: "title"}}, PrimaryKey: []string{"tenant", "id"}})
 	return u, p, n.Relation{From: u, To: p, FromColumns: []string{"tenant", "id"}, ToColumns: []string{"tenant", "user_id"}}
 }
+
 func require[T any](t *testing.T, got, want T) {
 	t.Helper()
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %#v; want %#v", got, want)
 	}
 }
+
 func build(t *testing.T, q n.Buildable, d n.Dialect) n.Statement {
 	t.Helper()
 	s, e := q.Build(d)
@@ -133,7 +135,7 @@ func database(t *testing.T) *sql.DB {
 		`INSERT INTO users(id,tenant,name) VALUES (1,7,'Alice'),(2,7,'Bob'),(1,8,'Other')`,
 		`INSERT INTO posts VALUES (1,7,1,'first'),(2,7,1,'second'),(3,7,2,'third'),(1,8,1,'private')`,
 	} {
-		if _, err := db.Exec(s); err != nil {
+		if _, err := db.ExecContext(t.Context(), s); err != nil {
 			t.Fatal(err)
 		}
 	}

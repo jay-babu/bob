@@ -18,8 +18,10 @@ type Executor interface {
 	ExecContext(context.Context, string, ...any) (sql.Result, error)
 }
 
-var _ Executor = (*sql.DB)(nil)
-var _ Executor = (*sql.Tx)(nil)
+var (
+	_ Executor = (*sql.DB)(nil)
+	_ Executor = (*sql.Tx)(nil)
+)
 
 type Scanner interface{ Scan(...any) error }
 
@@ -106,6 +108,7 @@ func (s Session) finished(ctx context.Context, stmt Statement, start time.Time, 
 	s.observe(ctx, stmt, start, *count, *err)
 }
 
+//nolint:nonamedreturns // Deferred observation must see the final row count and error.
 func (s Session) Exec(ctx context.Context, q Buildable) (affected int64, err error) {
 	stmt, err := q.Build(s.dialect)
 	if err != nil {
@@ -170,7 +173,7 @@ func One[T any](ctx context.Context, s Session, q Buildable, p Projection[T]) (T
 
 // Each streams rows and closes the cursor on success, cancellation, scan failure,
 // or early consumer exit. No reflection is used for mapping result values.
-func Each[T any](ctx context.Context, s Session, q Buildable, p Projection[T], yield func(T) error) (err error) {
+func Each[T any](ctx context.Context, s Session, q Buildable, p Projection[T], yield func(T) error) error {
 	if p.Scan == nil || yield == nil {
 		return fmt.Errorf("projection scanner and consumer are required")
 	}
@@ -282,7 +285,7 @@ func (s sqlStatement) Build(Dialect) (Statement, error) {
 
 // WithinTx gives the callback a session bound to exactly this transaction.
 // A callback error or panic rolls it back; there are no automatic retries.
-func WithinTx(ctx context.Context, db *sql.DB, d Dialect, opts *sql.TxOptions, observe Observer, fn func(Session) error) (err error) {
+func WithinTx(ctx context.Context, db *sql.DB, d Dialect, opts *sql.TxOptions, observe Observer, fn func(Session) error) error {
 	tx, err := db.BeginTx(ctx, opts)
 	if err != nil {
 		return err

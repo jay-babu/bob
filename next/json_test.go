@@ -22,7 +22,7 @@ func TestJSONTextPreservesPostgresOperatorAndBoundKeys(t *testing.T) {
 		t.Fatal("PostgreSQL JSON operator accepted by SQLite")
 	}
 	db := pgtest.Open(t)
-	if _, err := db.Exec(`CREATE TABLE documents(id bigint PRIMARY KEY,metadata jsonb);INSERT INTO documents VALUES(1,'{"external_id":"chosen"}'),(2,'{}')`); err != nil {
+	if _, err := db.ExecContext(t.Context(), `CREATE TABLE documents(id bigint PRIMARY KEY,metadata jsonb);INSERT INTO documents VALUES(1,'{"external_id":"chosen"}'),(2,'{}')`); err != nil {
 		t.Fatal(err)
 	}
 	projection := n.Projection[int64]{Columns: []n.Selection{n.Field[int64](ref, "id").Select("id")}, Scan: func(s n.Scanner) (int64, error) { var id int64; err := s.Scan(&id); return id, err }}

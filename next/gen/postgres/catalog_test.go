@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -43,7 +42,7 @@ func TestCatalogAndGeneratedTypes(t *testing.T) {
 		`CREATE TABLE inventory.events(id bigint NOT NULL) PARTITION BY RANGE(id)`,
 		`CREATE TABLE inventory.events_zero PARTITION OF inventory.events FOR VALUES FROM (0) TO (100)`,
 	} {
-		if _, err := db.Exec(ddl); err != nil {
+		if _, err := db.ExecContext(t.Context(), ddl); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -51,7 +50,7 @@ func TestCatalogAndGeneratedTypes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	c := &counter{db: tx}
 	schema, err := postgres.Inspect(ctx, c, postgres.Options{Schemas: []string{"inventory"}, ImportPath: "example.org/catalog/models"})
 	if err != nil {
@@ -93,11 +92,11 @@ func TestCatalogAndGeneratedTypes(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, layout := range []string{gen.Flat, gen.Tables} {
-		if _, err := db.Exec(`TRUNCATE inventory.peer,inventory.thing`); err != nil {
+		if _, err := db.ExecContext(t.Context(), `TRUNCATE inventory.peer,inventory.thing`); err != nil {
 			t.Fatal(err)
 		}
 		dir := t.TempDir()
-		var relations []string
+		relations := make([]string, 0, len(schema.Relations))
 		for _, rel := range schema.Relations {
 			relations = append(relations, rel.Name)
 		}
@@ -154,7 +153,7 @@ ctx=n.WithExecutor(ctx,db,n.ExecutionConfig{});row,err:=c.Query().Where(c.Id.EQ(
 		// ranges, read-only views and both directions of the cyclic FK graph.
 		compile, cancel := context.WithTimeout(ctx, 45*time.Second)
 		defer cancel()
-		cmd := exec.CommandContext(compile, filepath.Join(runtime.GOROOT(), "bin", "go"), "test", "-mod=mod", "./...")
+		cmd := exec.CommandContext(compile, "go", "test", "-mod=mod", "./...")
 		cmd.Dir = dir
 		cmd.Env = append(os.Environ(), "GOWORK=off", "GOTOOLCHAIN=local")
 		if out, err := cmd.CombinedOutput(); err != nil {

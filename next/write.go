@@ -62,6 +62,7 @@ type Mutation struct {
 func Insert(ref Ref, sets ...Assignment) Mutation {
 	return Mutation{kind: insertKind, ref: ref, sets: slices.Clone(sets)}
 }
+
 func Update(ref Ref, sets ...Assignment) Mutation {
 	return Mutation{kind: updateKind, ref: ref, sets: slices.Clone(sets)}
 }
@@ -100,121 +101,29 @@ func (m Mutation) Build(d Dialect) (Statement, error) {
 		return Statement{}, fmt.Errorf("ON CONFLICT is only valid for inserts")
 	}
 	r := &renderer{dialect: d, scope: map[*binding]string{m.ref.b: identifierAlias(m.ref.b.alias, d)}}
-	sets := make([]Assignment, 0, len(m.sets))
-	seen := map[string]bool{}
-	for _, a := range m.sets {
-		if a.kind == omitted {
-			continue
-		}
-		if a.ref.b != m.ref.b {
-			return Statement{}, fmt.Errorf("assignment belongs to another table reference")
-		}
-		c, ok := t.column(a.name)
-		if !ok || c.Generated || seen[a.name] {
-			return Statement{}, fmt.Errorf("unknown, generated, or repeated assignment %s", a.name)
-		}
-		if a.kind == defaulted && !c.HasDefault && !c.Nullable {
-			return Statement{}, fmt.Errorf("column %s has no default", a.name)
-		}
-		if n, ok := a.value.(literalNode); ok && n == "NULL" && !c.Nullable {
-			return Statement{}, fmt.Errorf("column %s is not nullable", a.name)
-		}
-		if a.kind == defaulted && d == SQLite && m.kind == updateKind {
-			return Statement{}, fmt.Errorf("SQLite does not support SET column = DEFAULT")
-		}
-		seen[a.name] = true
-		// Omitting a DEFAULT column in INSERT works in every supported dialect.
-		if a.kind == defaulted && m.kind == insertKind {
-			continue
-		}
-		sets = append(sets, a)
+	sets, seen, err := m.assignments(d, t)
+	if err != nil {
+		return Statement{}, err
 	}
-	if m.kind == insertKind {
-		for _, c := range t.info.Columns {
-			if !c.Nullable && !c.Generated && !c.HasDefault && !seen[c.Name] {
-				return Statement{}, fmt.Errorf("required insert column %s is missing", c.Name)
-			}
-		}
-		r.WriteString("INSERT INTO ")
-		writeTableName(r, t)
-		// INSERT values cannot reference the row being inserted.
-		r.scope = map[*binding]string{}
-		if len(sets) == 0 {
-			if d == MySQL {
-				r.WriteString(" () VALUES ()")
-			} else {
-				r.WriteString(" DEFAULT VALUES")
-			}
-		} else {
-			r.WriteString(" (")
-			for i, a := range sets {
-				if i > 0 {
-					r.WriteString(", ")
-				}
-				r.ident(a.name)
-			}
-			r.WriteString(") VALUES (")
-			for i, a := range sets {
-				if i > 0 {
-					r.WriteString(", ")
-				}
-				r.expr(a.value)
-			}
-			r.WriteByte(')')
-		}
-	} else {
-		if m.kind == updateKind {
-			if len(sets) == 0 {
-				return Statement{}, fmt.Errorf("update has no assignments")
-			}
-			r.WriteString("UPDATE ")
-			r.ref(m.ref)
-			r.WriteString(" SET ")
-			for i, a := range sets {
-				if i > 0 {
-					r.WriteString(", ")
-				}
-				r.ident(a.name)
-				r.WriteString(" = ")
-				if a.kind == defaulted {
-					r.WriteString("DEFAULT")
-				} else {
-					r.expr(a.value)
-				}
-			}
-		} else {
-			r.WriteString("DELETE FROM ")
-			r.ref(m.ref)
-		}
+	switch m.kind {
+	case insertKind:
+		err = writeInsert(r, t, sets, seen)
+	case updateKind:
+		err = m.writeUpdate(r, sets)
+	default:
+		r.WriteString("DELETE FROM ")
+		r.ref(m.ref)
+	}
+	if err != nil {
+		return Statement{}, err
+	}
+	if m.kind != insertKind {
 		writeWhere(r, " WHERE ", m.where)
 	}
 	if m.conflict != nil {
 		m.writeConflict(r)
 	}
-	cols := make([]string, len(m.returning))
-	if len(m.returning) > 0 {
-		r.WriteString(" RETURNING ")
-		for i, c := range m.returning {
-			if i > 0 {
-				r.WriteString(", ")
-			}
-			// Portable RETURNING uses unqualified columns, not the mutation alias.
-			if n, ok := c.node.(columnNode); ok && n.ref.b == m.ref.b {
-				if _, exists := t.column(n.name); !exists {
-					r.fail(fmt.Errorf("unknown returning column %s", n.name))
-				}
-				r.ident(n.name)
-				cols[i] = n.name
-			} else {
-				r.fail(fmt.Errorf("RETURNING requires target-table columns"))
-			}
-			if c.label != "" {
-				r.WriteString(" AS ")
-				r.ident(identifierAlias(c.label, d))
-				cols[i] = identifierAlias(c.label, d)
-			}
-		}
-	}
+	cols := m.writeReturning(r, t)
 	if r.err != nil {
 		return Statement{}, r.err
 	}
@@ -227,4 +136,124 @@ func writeTableName(r *renderer, t *Table) {
 		r.WriteByte('.')
 	}
 	r.ident(t.info.Name)
+}
+
+func (m Mutation) assignments(d Dialect, t *Table) ([]Assignment, map[string]bool, error) {
+	sets := make([]Assignment, 0, len(m.sets))
+	seen := map[string]bool{}
+	for _, a := range m.sets {
+		if a.kind == omitted {
+			continue
+		}
+		if a.ref.b != m.ref.b {
+			return nil, nil, fmt.Errorf("assignment belongs to another table reference")
+		}
+		c, ok := t.column(a.name)
+		if !ok || c.Generated || seen[a.name] {
+			return nil, nil, fmt.Errorf("unknown, generated, or repeated assignment %s", a.name)
+		}
+		if a.kind == defaulted && !c.HasDefault && !c.Nullable {
+			return nil, nil, fmt.Errorf("column %s has no default", a.name)
+		}
+		if n, ok := a.value.(literalNode); ok && n == "NULL" && !c.Nullable {
+			return nil, nil, fmt.Errorf("column %s is not nullable", a.name)
+		}
+		if a.kind == defaulted && d == SQLite && m.kind == updateKind {
+			return nil, nil, fmt.Errorf("SQLite does not support SET column = DEFAULT")
+		}
+		seen[a.name] = true
+		// Omitting a DEFAULT column in INSERT works in every supported dialect.
+		if a.kind == defaulted && m.kind == insertKind {
+			continue
+		}
+		sets = append(sets, a)
+	}
+	return sets, seen, nil
+}
+
+func writeInsert(r *renderer, t *Table, sets []Assignment, seen map[string]bool) error {
+	for _, c := range t.info.Columns {
+		if !c.Nullable && !c.Generated && !c.HasDefault && !seen[c.Name] {
+			return fmt.Errorf("required insert column %s is missing", c.Name)
+		}
+	}
+	r.WriteString("INSERT INTO ")
+	writeTableName(r, t)
+	// INSERT values cannot reference the row being inserted.
+	r.scope = map[*binding]string{}
+	if len(sets) == 0 {
+		if r.dialect == MySQL {
+			r.WriteString(" () VALUES ()")
+		} else {
+			r.WriteString(" DEFAULT VALUES")
+		}
+		return nil
+	}
+	r.WriteString(" (")
+	for i, a := range sets {
+		if i > 0 {
+			r.WriteString(", ")
+		}
+		r.ident(a.name)
+	}
+	r.WriteString(") VALUES (")
+	for i, a := range sets {
+		if i > 0 {
+			r.WriteString(", ")
+		}
+		r.expr(a.value)
+	}
+	r.WriteByte(')')
+	return nil
+}
+
+func (m Mutation) writeReturning(r *renderer, t *Table) []string {
+	cols := make([]string, len(m.returning))
+	if len(m.returning) == 0 {
+		return cols
+	}
+	r.WriteString(" RETURNING ")
+	for i, c := range m.returning {
+		if i > 0 {
+			r.WriteString(", ")
+		}
+		// Portable RETURNING uses unqualified columns, not the mutation alias.
+		if n, ok := c.node.(columnNode); ok && n.ref.b == m.ref.b {
+			if _, exists := t.column(n.name); !exists {
+				r.fail(fmt.Errorf("unknown returning column %s", n.name))
+			}
+			r.ident(n.name)
+			cols[i] = n.name
+		} else {
+			r.fail(fmt.Errorf("RETURNING requires target-table columns"))
+		}
+		if c.label != "" {
+			r.WriteString(" AS ")
+			r.ident(identifierAlias(c.label, r.dialect))
+			cols[i] = identifierAlias(c.label, r.dialect)
+		}
+	}
+	return cols
+}
+
+func (m Mutation) writeUpdate(r *renderer, sets []Assignment) error {
+	if len(sets) == 0 {
+		return fmt.Errorf("update has no assignments")
+	}
+	r.WriteString("UPDATE ")
+	r.ref(m.ref)
+	r.WriteString(" SET ")
+	for i, a := range sets {
+		if i > 0 {
+			r.WriteString(", ")
+		}
+		r.ident(a.name)
+		r.WriteString(" = ")
+		if a.kind == defaulted {
+			r.WriteString("DEFAULT")
+		} else {
+			r.expr(a.value)
+		}
+	}
+	return nil
 }

@@ -11,7 +11,7 @@ import (
 
 func TestNativeDatabaseGeneration(t *testing.T) {
 	db := pgtest.Open(t)
-	if _, err := db.Exec(`CREATE TABLE item(id bigint PRIMARY KEY,name text NOT NULL,note text)`); err != nil {
+	if _, err := db.ExecContext(t.Context(), `CREATE TABLE item(id bigint PRIMARY KEY,name text NOT NULL,note text)`); err != nil {
 		t.Fatal(err)
 	}
 	dir := t.TempDir()

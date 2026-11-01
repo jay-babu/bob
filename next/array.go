@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -140,27 +141,27 @@ func (a Array[T]) Value() (driver.Value, error) {
 				if err := group(depth + 1); err != nil {
 					return err
 				}
-			} else {
-				e := a.Elements[index]
-				index++
-				if !e.Valid {
-					b.WriteString("NULL")
-					continue
-				}
-				text, err := arrayScalar(e.V)
-				if err != nil {
-					return err
-				}
-				b.WriteByte('"')
-				for j := 0; j < len(text); j++ {
-					c := text[j]
-					if c == '"' || c == '\\' {
-						b.WriteByte('\\')
-					}
-					b.WriteByte(c)
-				}
-				b.WriteByte('"')
+				continue
 			}
+			e := a.Elements[index]
+			index++
+			if !e.Valid {
+				b.WriteString("NULL")
+				continue
+			}
+			text, err := arrayScalar(e.V)
+			if err != nil {
+				return err
+			}
+			b.WriteByte('"')
+			for j := 0; j < len(text); j++ {
+				c := text[j]
+				if c == '"' || c == '\\' {
+					b.WriteByte('\\')
+				}
+				b.WriteByte(c)
+			}
+			b.WriteByte('"')
 		}
 		b.WriteByte('}')
 		return nil
@@ -214,6 +215,7 @@ func (p *arrayParser) peek() byte {
 	}
 	return p.input[p.pos]
 }
+
 func (p *arrayParser) consume(c byte) bool {
 	if p.peek() != c {
 		return false
@@ -221,6 +223,7 @@ func (p *arrayParser) consume(c byte) bool {
 	p.pos++
 	return true
 }
+
 func (p *arrayParser) integer() (int, error) {
 	start := p.pos
 	if p.peek() == '-' {
@@ -232,6 +235,7 @@ func (p *arrayParser) integer() (int, error) {
 	value, err := strconv.ParseInt(p.input[start:p.pos], 10, 32)
 	return int(value), err
 }
+
 func (p *arrayParser) group(depth int) ([]int, []arrayToken, error) {
 	if depth >= 6 || !p.consume('{') {
 		return nil, nil, fmt.Errorf("invalid array group")
@@ -249,15 +253,8 @@ func (p *arrayParser) group(depth int) ([]int, []arrayToken, error) {
 			if err != nil {
 				return nil, nil, err
 			}
-			if count > 0 {
-				if len(child) != len(shape) {
-					return nil, nil, fmt.Errorf("ragged array")
-				}
-				for i, n := range child {
-					if n != shape[i] {
-						return nil, nil, fmt.Errorf("ragged array")
-					}
-				}
+			if count > 0 && !slices.Equal(child, shape) {
+				return nil, nil, fmt.Errorf("ragged array")
 			}
 			shape = child
 			tokens = append(tokens, values...)
@@ -281,6 +278,7 @@ func (p *arrayParser) group(depth int) ([]int, []arrayToken, error) {
 	}
 	return append([]int{count}, shape...), tokens, nil
 }
+
 func (p *arrayParser) token() (arrayToken, error) {
 	quoted := p.consume('"')
 	escaped := false

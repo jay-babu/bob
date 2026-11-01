@@ -21,10 +21,10 @@ import (
 func TestNativePGXContextUsesDBExecTransaction(t *testing.T) {
 	db := pgtest.Open(t)
 	ctx := context.Background()
-	if _, err := db.Exec(`CREATE TABLE users(id bigint NOT NULL,tenant bigint NOT NULL,name text NOT NULL,note text,version bigint NOT NULL DEFAULT 1,fingerprint bigint GENERATED ALWAYS AS(id*2) STORED,PRIMARY KEY(tenant,id))`); err != nil {
+	if _, err := db.ExecContext(t.Context(), `CREATE TABLE users(id bigint NOT NULL,tenant bigint NOT NULL,name text NOT NULL,note text,version bigint NOT NULL DEFAULT 1,fingerprint bigint GENERATED ALWAYS AS(id*2) STORED,PRIMARY KEY(tenant,id))`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`CREATE TABLE posts(id bigint NOT NULL,tenant bigint NOT NULL,user_id bigint NOT NULL,title text NOT NULL,PRIMARY KEY(tenant,id))`); err != nil {
+	if _, err := db.ExecContext(t.Context(), `CREATE TABLE posts(id bigint NOT NULL,tenant bigint NOT NULL,user_id bigint NOT NULL,title text NOT NULL,PRIMARY KEY(tenant,id))`); err != nil {
 		t.Fatal(err)
 	}
 	conn, err := pgx.Connect(ctx, pgtest.DSN(t, db))
@@ -107,7 +107,7 @@ func TestNativePGXContextUsesDBExecTransaction(t *testing.T) {
 func TestPGXReturningPreservesDatabaseConstraintErrors(t *testing.T) {
 	db := pgtest.Open(t)
 	ctx := context.Background()
-	if _, err := db.Exec(`CREATE TABLE users(id bigint NOT NULL,tenant bigint NOT NULL,name text NOT NULL,note text,version bigint NOT NULL DEFAULT 1,fingerprint bigint GENERATED ALWAYS AS(id*2) STORED,PRIMARY KEY(tenant,id))`); err != nil {
+	if _, err := db.ExecContext(t.Context(), `CREATE TABLE users(id bigint NOT NULL,tenant bigint NOT NULL,name text NOT NULL,note text,version bigint NOT NULL DEFAULT 1,fingerprint bigint GENERATED ALWAYS AS(id*2) STORED,PRIMARY KEY(tenant,id))`); err != nil {
 		t.Fatal(err)
 	}
 	for _, mode := range []pgx.QueryExecMode{pgx.QueryExecModeCacheStatement, pgx.QueryExecModeExec, pgx.QueryExecModeSimpleProtocol} {
@@ -125,7 +125,7 @@ func TestPGXReturningPreservesDatabaseConstraintErrors(t *testing.T) {
 			bound := bobexec.WithExecutor(ctx, bobpgx.NewConn(conn), n.ExecutionConfig{})
 			u := models.UsersAs("u")
 			input := models.UsersInsert{ID: int64(mode), Tenant: 7, Name: "duplicate"}
-			if _, err := db.Exec(`INSERT INTO users(id,tenant,name) VALUES($1,$2,$3)`, input.ID, input.Tenant, input.Name); err != nil {
+			if _, err := db.ExecContext(t.Context(), `INSERT INTO users(id,tenant,name) VALUES($1,$2,$3)`, input.ID, input.Tenant, input.Name); err != nil {
 				t.Fatal(err)
 			}
 			_, err = u.Insert(input).OneContext(bound)

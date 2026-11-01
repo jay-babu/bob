@@ -57,6 +57,7 @@ func ParseDecimal(text string) (Decimal, error) {
 	}
 	return Decimal{text}, nil
 }
+
 func (d Decimal) String() string {
 	if d.text == "" {
 		return "0"
@@ -83,9 +84,11 @@ func (d *Decimal) Scan(src any) error {
 	*d = value
 	return nil
 }
+
 func (d Decimal) MarshalJSON() ([]byte, error) {
 	return jsonv2.Marshal(d.String())
 }
+
 func (d *Decimal) UnmarshalJSON(data []byte) error {
 	if len(data) > 0 && data[0] == '"' {
 		var text string
@@ -129,6 +132,7 @@ func (j *JSON[T]) Scan(src any) error {
 		return fmt.Errorf("cannot scan %T into JSON", src)
 	}
 }
+
 func (j JSON[T]) Value() (driver.Value, error) {
 	data, err := jsonv2.Marshal(j.V)
 	return string(data), err

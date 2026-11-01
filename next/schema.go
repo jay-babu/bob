@@ -128,15 +128,22 @@ type Column[T any] struct {
 func Field[T any](ref Ref, name string) Column[T] { return Column[T]{ref, name} }
 func (c Column[T]) Reference() Ref                { return c.ref }
 func (c Column[T]) Name() string                  { return c.name }
-func (c Column[T]) Expr() Expr[T]                 { return Expr[T]{node: columnNode{c.ref, c.name}} }
+func (c Column[T]) Expr() Expr[T]                 { return Expr[T]{node: columnNode(c)} }
 func (c Column[T]) EQ(v T) Predicate              { return Equal(c.Expr(), Value(v)) }
 func (c Column[T]) NE(v T) Predicate              { return compare(c.Expr().node, "<>", Value(v).node) }
-func (c Column[T]) GT(v T) Predicate              { return compare(c.Expr().node, ">", Value(v).node) }
-func (c Column[T]) GE(v T) Predicate              { return compare(c.Expr().node, ">=", Value(v).node) }
-func (c Column[T]) LT(v T) Predicate              { return compare(c.Expr().node, "<", Value(v).node) }
-func (c Column[T]) LE(v T) Predicate              { return compare(c.Expr().node, "<=", Value(v).node) }
-func (c Column[T]) IsNull() Predicate             { return Predicate{unaryNode{c.Expr().node, "IS NULL"}} }
-func (c Column[T]) IsNotNull() Predicate          { return Predicate{unaryNode{c.Expr().node, "IS NOT NULL"}} }
+
+func (c Column[T]) GT(v T) Predicate { return compare(c.Expr().node, ">", Value(v).node) }
+
+func (c Column[T]) GE(v T) Predicate { return compare(c.Expr().node, ">=", Value(v).node) }
+
+func (c Column[T]) LT(v T) Predicate { return compare(c.Expr().node, "<", Value(v).node) }
+
+func (c Column[T]) LE(v T) Predicate { return compare(c.Expr().node, "<=", Value(v).node) }
+
+func (c Column[T]) IsNull() Predicate { return Predicate{unaryNode{c.Expr().node, "IS NULL"}} }
+
+func (c Column[T]) IsNotNull() Predicate { return Predicate{unaryNode{c.Expr().node, "IS NOT NULL"}} }
+
 func (c Column[T]) In(values ...T) Predicate {
 	nodes := make([]node, len(values))
 	for i, v := range values {
